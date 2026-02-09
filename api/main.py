@@ -19,6 +19,23 @@ prefix = "/api" if os.getenv("VERCEL") else ""
 app.include_router(auth_router, prefix=prefix)
 
 
+@app.get(prefix + "/health")
+def health():
+    try:
+        from database import get_db
+        db = get_db()
+        # Ping the database to check connection
+        db.command("ping")
+        return {"status": "ok", "db": "connected"}
+    except Exception as e:
+        import traceback
+        return {
+            "status": "error",
+            "message": str(e),
+            "traceback": traceback.format_exc() if os.getenv("VERCEL") else None
+        }
+
+
 @app.get(prefix + "/")
 def root():
     return {"message": "MindRise API", "docs": "/docs"}
