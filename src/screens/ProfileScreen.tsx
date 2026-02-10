@@ -4,9 +4,13 @@ import { useAuth } from "../context/AuthContext";
 import { LogOut, Settings, ChevronRight, User, Shield, Trash2, MoreVertical } from "lucide-react";
 import { Post } from "../types";
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV ? "http://localhost:8000" : "/api");
+const getApiBase = () => {
+  const base = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000" : "/api");
+  if (base.startsWith("http")) return base;
+  return window.location.origin + (base.startsWith("/") ? "" : "/") + base;
+};
+
+const API_BASE = getApiBase();
 
 export default function ProfileScreen() {
   const navigate = useNavigate();
@@ -210,14 +214,21 @@ export default function ProfileScreen() {
                   <p className="text-slate-700 text-sm mb-2">{post.content}</p>
                   {post.image_url && (
                     <img
-                      src={post.image_url.startsWith("/static") ? `${API_BASE}${post.image_url.replace("/static", "/static")}` : post.image_url}
+                      src={post.image_url.startsWith("/static") ? `${API_BASE}${post.image_url}` : post.image_url}
                       alt="Post content"
                       className="w-full h-32 object-cover rounded-xl mb-2"
                     />
                   )}
-                  {post.status === "rejected" && post.rejection_reason && (
-                    <div className="bg-red-50 p-2 rounded text-xs text-red-700 mt-2 border border-red-100">
-                      <strong>Moderator Note:</strong> {post.rejection_reason}
+                  {post.status === "rejected" && (
+                    <div className="bg-red-50 p-3 rounded-lg mt-3 border border-red-100">
+                      <p className="text-red-700 font-bold text-xs mb-1">
+                        ⚠️ This post is against the community guidelines
+                      </p>
+                      {post.rejection_reason && (
+                        <p className="text-red-600 text-xs">
+                          Reason: {post.rejection_reason}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

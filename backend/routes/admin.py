@@ -47,7 +47,7 @@ def get_stats(role: str | None = None):
     }
 
 @router.get("/posts", response_model=List[PostResponse])
-def get_pending_posts(role: str | None = None):
+def get_posts(status: str = "pending", role: str | None = None):
     if role != "admin":
          raise HTTPException(status_code=403, detail="Forbidden: Admin access required")
     
@@ -55,7 +55,11 @@ def get_pending_posts(role: str | None = None):
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established")
     
-    posts_cursor = db.posts.find({"status": "pending"}).sort("created_at", -1)
+    filter_query = {}
+    if status != "all":
+        filter_query["status"] = status
+
+    posts_cursor = db.posts.find(filter_query).sort("created_at", -1)
     results = []
     
     # Collect user IDs to batch fetch emails

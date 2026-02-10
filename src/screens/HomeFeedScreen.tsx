@@ -6,9 +6,13 @@ import { Post } from "../types";
 
 const TABS = ["All Posts", "Daily Quotes", "Gratitude"] as const;
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV ? "http://localhost:8000" : "/api"); // Ensure consistency
+const getApiBase = () => {
+  const base = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000" : "/api");
+  if (base.startsWith("http")) return base;
+  return window.location.origin + (base.startsWith("/") ? "" : "/") + base;
+};
+
+const API_BASE = getApiBase();
 
 export default function HomeFeedScreen() {
   const navigate = useNavigate();
@@ -74,20 +78,18 @@ export default function HomeFeedScreen() {
         if (uploadRes.ok) {
           const data = await uploadRes.json();
           imageUrl = data.url;
-          // Prepend API_BASE if needed, but the backend returns relative path /static/...
-          // If in dev mode, we might need full URL unless we proxy.
-          // Let's assume frontend can handle relative URL if it knows base.
-          // Or we can store absolute URL. Let's store relative.
         } else {
           throw new Error("Image upload failed");
         }
       }
 
-      const url = new URL(`${API_BASE}/posts/`);
-      url.searchParams.append("user_id", user.id);
-      url.searchParams.append("author_name", user.full_name || user.email);
+      // Fix: Use template literal instead of URL object to avoid Vercel relative URL issues
+      const queryParams = new URLSearchParams({
+        user_id: user.id || "",
+        author_name: user.full_name || user.email || ""
+      }).toString();
 
-      const response = await fetch(url.toString(), {
+      const response = await fetch(`${API_BASE}/posts/?${queryParams}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -105,9 +107,9 @@ export default function HomeFeedScreen() {
       } else {
         alert("Failed to submit post.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating post", error);
-      alert("Error submitting post. " + error);
+      alert(`Error submitting post. ${error.name}: ${error.message}\nAPI_BASE: ${API_BASE}`);
     } finally {
       setIsUploading(false);
     }
@@ -185,7 +187,7 @@ export default function HomeFeedScreen() {
               <p className="text-slate-700">{post.content}</p>
               {post.image_url && (
                 <img
-                  src={post.image_url.startsWith("/static") ? `${API_BASE}${post.image_url.replace("/static", "/static")}` : post.image_url}
+                  src={post.image_url.startsWith("/static") ? `${API_BASE}${post.image_url}` : post.image_url}
                   alt="Post content"
                   className="w-full h-48 object-cover rounded-xl mt-3"
                 />
