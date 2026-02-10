@@ -22,18 +22,33 @@ def create_post(post: PostCreate, user_id: str, author_name: str):
         "rejection_reason": None
     }
     
-    result = db.posts.insert_one(doc)
+    result = db.pending_posts.insert_one(doc)
     doc["id"] = str(result.inserted_id)
     return doc
 
 @router.get("/", response_model=list[PostResponse])
-def get_feed():
+def get_feed(user_id: str | None = None):
     db = get_db()
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established")
     
-    # Return only approved posts, sorted by newest first
-    posts_cursor = db.posts.find({"status": "approved"}).sort("created_at", -1)
+    # If user_id is provided, only show posts from friends and self
+    if user_id:
+        friendships = list(db.friendships.find({
+            "$or": [
+                {"user1": user_id},
+                {"user2": user_id}
+            ]
+        }))
+        friend_ids = [user_id]
+        for f in friendships:
+            friend_ids.append(f["user2"] if f["user1"] == user_id else f["user1"])
+            
+        posts_cursor = db.posts.find({"user_id": {"$in": friend_ids}}).sort("created_at", -1)
+    else:
+        # Fallback to all approved posts if no user_id
+        posts_cursor = db.posts.find().sort("created_at", -1)
+        
     results = []
     for doc in posts_cursor:
         doc["id"] = str(doc["_id"])
@@ -46,10 +61,16 @@ def get_my_posts(user_id: str):
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established")
     
-    # Return all posts for the user
-    posts_cursor = db.posts.find({"user_id": user_id}).sort("created_at", -1)
+    # Return all posts for the user from both collections
+    approved_posts = list(db.posts.find({"user_id": user_id}))
+    pending_posts = list(db.pending_posts.find({"user_id": user_id}))
+    
+    combined_posts = approved_posts + pending_posts
+    # Sort by newest first
+    combined_posts.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    
     results = []
-    for doc in posts_cursor:
+    for doc in combined_posts:
         doc["id"] = str(doc["_id"])
         results.append(doc)
     return results
@@ -60,9 +81,11 @@ def delete_post(post_id: str, user_id: str):
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established")
     
-    # Simple check to ensure user owns the post
-    result = db.posts.delete_one({"_id": ObjectId(post_id), "user_id": user_id})
-    if result.deleted_count == 0:
+    # Attempt deletion in both collections
+    result_approved = db.posts.delete_one({"_id": ObjectId(post_id), "user_id": user_id})
+    result_pending = db.pending_posts.delete_one({"_id": ObjectId(post_id), "user_id": user_id})
+    
+    if result_approved.deleted_count == 0 and result_pending.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Post not found or unauthorized")
     
     return {"message": "Post deleted"}

@@ -50,17 +50,6 @@ def search_users(query: str, current_user_id: str):
         ))
     print(f"DEBUG: Returning {len(results)} results")
     return results
-    
-    results = []
-    for user in users_cursor:
-        results.append(UserResponse(
-            id=str(user["_id"]),
-            email=user["email"],
-            full_name=user.get("full_name"),
-            role=user.get("role", "user"),
-            is_verified=True
-        ))
-    return results
 
 @router.post("/request")
 def send_friend_request(from_user_id: str, to_user_id: str):
