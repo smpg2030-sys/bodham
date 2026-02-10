@@ -17,6 +17,9 @@ export default function HomeFeedScreen() {
   const [showNewPost, setShowNewPost] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [postContent, setPostContent] = useState("");
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const [posts, setPosts] = useState<Post[]>([]);
@@ -41,29 +44,44 @@ export default function HomeFeedScreen() {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleCreatePost = async () => {
-    if (!postContent.trim() || !user) return;
+    if ((!postContent.trim() && !selectedFile) || !user) return;
 
+    setIsUploading(true);
     try {
-      const res = await fetch(`${API_BASE}/posts/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // Ideally we should send a token, but for now passing user_id as per backend implementation
-        // We need to pass user_id and author_name as query params or body? 
-        // Backend definition: create_post(post: PostCreate, user_id: str, author_name: str)
-        // FastAPI defaults to query params for scalar types not in Pydantic model.
-        // Let's check backend/routes/posts.py again. create_post uses DI? No, just args.
-        // So params: ?user_id=...&author_name=...
-        body: JSON.stringify({ content: postContent }),
-      });
+      let imageUrl = null;
+      if (selectedFile) {
+        const formData = new FormData();
+        formData.append("file", selectedFile);
 
-      // Wait, I need to send user_id and author_name. 
-      // If I send JSON body, it maps to `post: PostCreate`. 
-      // `user_id` and `author_name` are separate arguments, so they are Query parameters by default in FastAPI.
-      // I should update the fetch call to include them in URL.
-      // Re-reading backend/routes/posts.py:
-      // def create_post(post: PostCreate, user_id: str, author_name: str):
-      // Yes, they are query params.
+        const uploadRes = await fetch(`${API_BASE}/upload/`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (uploadRes.ok) {
+          const data = await uploadRes.json();
+          imageUrl = data.url;
+          // Prepend API_BASE if needed, but the backend returns relative path /static/...
+          // If in dev mode, we might need full URL unless we proxy.
+          // Let's assume frontend can handle relative URL if it knows base.
+          // Or we can store absolute URL. Let's store relative.
+        } else {
+          throw new Error("Image upload failed");
+        }
+      }
 
       const url = new URL(`${API_BASE}/posts/`);
       url.searchParams.append("user_id", user.id);
@@ -72,20 +90,26 @@ export default function HomeFeedScreen() {
       const response = await fetch(url.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: postContent }),
+        body: JSON.stringify({
+          content: postContent,
+          image_url: imageUrl
+        }),
       });
 
       if (response.ok) {
         alert("Post submitted for review! ✅");
         setPostContent("");
+        setSelectedFile(null);
+        setImagePreview(null);
         setShowNewPost(false);
-        // We don't refresh feed because it only shows approved posts.
       } else {
         alert("Failed to submit post.");
       }
     } catch (error) {
       console.error("Error creating post", error);
-      alert("Error submitting post.");
+      alert("Error submitting post. " + error);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -159,6 +183,13 @@ export default function HomeFeedScreen() {
                 </div>
               </div>
               <p className="text-slate-700">{post.content}</p>
+              {post.image_url && (
+                <img
+                  src={post.image_url.startsWith("/static") ? `${API_BASE}${post.image_url.replace("/static", "/static")}` : post.image_url}
+                  alt="Post content"
+                  className="w-full h-48 object-cover rounded-xl mt-3"
+                />
+              )}
             </div>
           ))
         )}
@@ -181,9 +212,10 @@ export default function HomeFeedScreen() {
               <button
                 type="button"
                 onClick={handleCreatePost}
-                className="px-6 py-2 rounded-xl font-semibold text-white bg-gradient-to-r from-green-400 to-green-600"
+                disabled={isUploading}
+                className="px-6 py-2 rounded-xl font-semibold text-white bg-gradient-to-r from-green-400 to-green-600 disabled:opacity-50"
               >
-                Post
+                {isUploading ? "Posting..." : "Post"}
               </button>
             </div>
             <textarea
@@ -192,6 +224,23 @@ export default function HomeFeedScreen() {
               value={postContent}
               onChange={(e) => setPostContent(e.target.value)}
             />
+
+            {imagePreview && (
+              <div className="relative mb-4">
+                <img src={imagePreview} alt="Preview" className="w-full h-48 object-cover rounded-xl" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImagePreview(null);
+                    setSelectedFile(null);
+                  }}
+                  className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1"
+                >
+                  <div className="text-xs">✕</div>
+                </button>
+              </div>
+            )}
+
             <button
               type="button"
               className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-violet-500 to-purple-600 mb-4"
@@ -202,12 +251,12 @@ export default function HomeFeedScreen() {
               <label className="p-4 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer text-center hover:bg-slate-50">
                 <span className="text-2xl block mb-1">📷</span>
                 <span className="text-sm text-slate-500">Camera</span>
-                <input type="file" accept="image/*" className="hidden" />
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileSelect} />
               </label>
               <label className="p-4 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer text-center hover:bg-slate-50">
                 <span className="text-2xl block mb-1">🖼️</span>
                 <span className="text-sm text-slate-500">Gallery</span>
-                <input type="file" accept="image/*,video/*" className="hidden" />
+                <input type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
               </label>
             </div>
             <p className="text-xs text-slate-400 mt-4 text-center">Posts are moderated before appearing</p>

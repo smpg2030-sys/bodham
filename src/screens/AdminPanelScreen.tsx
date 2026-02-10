@@ -131,6 +131,7 @@ export default function AdminPanelScreen() {
                     </span>
                     <div>
                       <p className="font-semibold text-sm">{post.author_name}</p>
+                      {post.author_email && <p className="text-xs text-slate-500">{post.author_email}</p>}
                       <p className="text-xs text-slate-400">{new Date(post.created_at).toLocaleString()}</p>
                     </div>
                   </div>
@@ -141,6 +142,13 @@ export default function AdminPanelScreen() {
                 <p className="text-slate-800 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
                   {post.content}
                 </p>
+                {post.image_url && (
+                  <img
+                    src={post.image_url.startsWith("/static") ? `${API_BASE}${post.image_url.replace("/static", "/static")}` : post.image_url}
+                    alt="Post content"
+                    className="w-full h-48 object-cover rounded-xl mb-4"
+                  />
+                )}
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleModeration(post.id, "approved")}

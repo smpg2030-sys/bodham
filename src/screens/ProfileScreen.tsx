@@ -10,9 +10,30 @@ const API_BASE =
 
 export default function ProfileScreen() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, setUser } = useAuth();
   const [activeTab, setActiveTab] = useState<"posts" | "saved">("posts");
   const [showSettings, setShowSettings] = useState(false);
+
+  useEffect(() => {
+    if (user?.id) {
+      refreshUserRole();
+    }
+  }, [user?.id]);
+
+  const refreshUserRole = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/user/${user?.id}`);
+      if (res.ok) {
+        const freshUser = await res.json();
+        // Only update if role changed (to avoid loops, though useEffect deps handles most)
+        if (freshUser.role !== user?.role) {
+          setUser(freshUser);
+        }
+      }
+    } catch (e) {
+      console.error("User refresh failed", e);
+    }
+  };
 
   const [myPosts, setMyPosts] = useState<Post[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
@@ -39,6 +60,8 @@ export default function ProfileScreen() {
       setLoadingPosts(false);
     }
   };
+
+
 
   const handleDeletePost = async (postId: string) => {
     if (!confirm("Are you sure you want to delete this post?")) return;
@@ -185,6 +208,13 @@ export default function ProfileScreen() {
                     </button>
                   </div>
                   <p className="text-slate-700 text-sm mb-2">{post.content}</p>
+                  {post.image_url && (
+                    <img
+                      src={post.image_url.startsWith("/static") ? `${API_BASE}${post.image_url.replace("/static", "/static")}` : post.image_url}
+                      alt="Post content"
+                      className="w-full h-32 object-cover rounded-xl mb-2"
+                    />
+                  )}
                   {post.status === "rejected" && post.rejection_reason && (
                     <div className="bg-red-50 p-2 rounded text-xs text-red-700 mt-2 border border-red-100">
                       <strong>Moderator Note:</strong> {post.rejection_reason}

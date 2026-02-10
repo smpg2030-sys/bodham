@@ -40,6 +40,7 @@ def generate_otp() -> str:
 
 @router.post("/register")
 async def register(data: UserRegister, background_tasks: BackgroundTasks):
+    print(f"Registration request for: {data.email}")
     db = get_db()
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established. Please check your configuration.")
@@ -51,7 +52,7 @@ async def register(data: UserRegister, background_tasks: BackgroundTasks):
         if existing_user.get("is_verified"):
             raise HTTPException(status_code=400, detail="Email already registered")
         else:
-            # Resend OTP logic: update password/name and generate new OTP
+            # Resend OTP logic could go here, for now just update password/name and resend
             pass
 
     otp = generate_otp()

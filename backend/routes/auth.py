@@ -40,6 +40,7 @@ def generate_otp() -> str:
 
 @router.post("/register")
 async def register(data: UserRegister, background_tasks: BackgroundTasks):
+    print(f"Registration request for: {data.email}")
     db = get_db()
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established. Please check your configuration.")
@@ -128,4 +129,27 @@ def login(data: UserLogin):
         full_name=user.get("full_name") or None,
         role=user.get("role", "user"),
         is_verified=True
+    )
+
+@router.get("/user/{user_id}", response_model=UserResponse)
+def get_user(user_id: str):
+    db = get_db()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    from bson import ObjectId
+    try:
+        user = db.users.find_one({"_id": ObjectId(user_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid User ID")
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return UserResponse(
+        id=str(user["_id"]),
+        email=user["email"],
+        full_name=user.get("full_name"),
+        role=user.get("role", "user"),
+        is_verified=user.get("is_verified", False)
     )

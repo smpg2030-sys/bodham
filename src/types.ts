@@ -10,6 +10,7 @@ export interface Post {
     id: string;
     user_id: string;
     author_name: string;
+    author_email?: string;
     content: string;
     image_url?: string;
     status: "pending" | "approved" | "rejected";
