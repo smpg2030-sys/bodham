@@ -19,8 +19,9 @@ def get_client() -> MongoClient:
             # Verify connection
             _client.admin.command('ping')
             print("Successfully connected to MongoDB.")
-        except (ConnectionFailure, ConfigurationError) as e:
+        except Exception as e:
             print(f"CRITICAL: Could not connect to MongoDB: {e}")
+            _client = None # Explicitly set to None on failure
     return _client
 
 

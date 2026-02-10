@@ -20,12 +20,29 @@ prefix = "/api" if os.getenv("VERCEL") else ""
 app.include_router(auth_router, prefix=prefix)
 app.include_router(admin_router, prefix=prefix)
 
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal Server Error",
+            "message": str(exc),
+            "traceback": traceback.format_exc()
+        }
+    )
+
 
 @app.get(prefix + "/health")
 def health():
     try:
         from database import get_db
         db = get_db()
+        if db is None:
+            return {"status": "error", "message": "Database not connected. Check your MONGO_URI and IP Whitelist."}
         # Ping the database to check connection
         db.command("ping")
         return {"status": "ok", "db": "connected"}
