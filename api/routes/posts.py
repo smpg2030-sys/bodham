@@ -27,13 +27,28 @@ def create_post(post: PostCreate, user_id: str, author_name: str):
     return doc
 
 @router.get("/", response_model=list[PostResponse])
-def get_feed():
+def get_feed(user_id: str | None = None):
     db = get_db()
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established")
     
-    # Return all posts in the posts collection (they are all approved)
-    posts_cursor = db.posts.find().sort("created_at", -1)
+    # If user_id is provided, only show posts from friends and self
+    if user_id:
+        friendships = list(db.friendships.find({
+            "$or": [
+                {"user1": user_id},
+                {"user2": user_id}
+            ]
+        }))
+        friend_ids = [user_id]
+        for f in friendships:
+            friend_ids.append(f["user2"] if f["user1"] == user_id else f["user1"])
+            
+        posts_cursor = db.posts.find({"user_id": {"$in": friend_ids}}).sort("created_at", -1)
+    else:
+        # Fallback to all approved posts if no user_id (e.g. initial load before auth context is ready)
+        posts_cursor = db.posts.find().sort("created_at", -1)
+        
     results = []
     for doc in posts_cursor:
         doc["id"] = str(doc["_id"])

@@ -25,26 +25,100 @@ export default function HomeFeedScreen() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchingUsers, setSearchingUsers] = useState(false);
+  const [friendRequests, setFriendRequests] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    fetchPosts();
-  }, []);
-
   const fetchPosts = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/posts/`);
-      if (res.ok) {
-        const data = await res.json();
-        setPosts(data);
-      }
+      const url = user ? `${API_BASE}/posts/?user_id=${user.id}` : `${API_BASE}/posts/`;
+      const res = await fetch(url);
+      const data = await res.json();
+      setPosts(data);
     } catch (error) {
-      console.error("Failed to fetch posts", error);
+      console.error("Error fetching posts:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFriendRequests = async () => {
+    if (!user) return;
+    try {
+      const res = await fetch(`${API_BASE}/friends/requests?user_id=${user.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setFriendRequests(data);
+      }
+    } catch (err) {
+      console.error("Error fetching friend requests:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchPosts();
+    if (user) {
+      fetchFriendRequests();
+      const interval = setInterval(fetchFriendRequests, 30000); // Poll every 30s
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const searchUsers = async () => {
+      if (searchQuery.length < 2) {
+        setSearchResults([]);
+        return;
+      }
+      setSearchingUsers(true);
+      try {
+        const res = await fetch(`${API_BASE}/friends/search?query=${searchQuery}&current_user_id=${user?.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data);
+        }
+      } catch (err) {
+        console.error("Error searching users:", err);
+      } finally {
+        setSearchingUsers(false);
+      }
+    };
+
+    const timeoutId = setTimeout(searchUsers, 500);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, user]);
+
+  const handleAddFriend = async (toUserId: string) => {
+    if (!user) return;
+    try {
+      const res = await fetch(`${API_BASE}/friends/request?from_user_id=${user.id}&to_user_id=${toUserId}`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        alert("Friend request sent!");
+      }
+    } catch (err) {
+      alert("Failed to send request.");
+    }
+  };
+
+  const handleRespondRequest = async (requestId: string, action: "accept" | "decline") => {
+    try {
+      const res = await fetch(`${API_BASE}/friends/respond?request_id=${requestId}&action=${action}`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        fetchFriendRequests();
+        fetchPosts(); // Refresh feed if accepted
+        alert(`Request ${action}ed!`);
+      }
+    } catch (err) {
+      alert("Failed to respond to request.");
     }
   };
 
@@ -128,8 +202,16 @@ export default function HomeFeedScreen() {
           >
             <Search className="w-5 h-5" />
           </button>
-          <button type="button" className="p-2 text-slate-600" aria-label="Notifications">
+          <button
+            type="button"
+            onClick={() => setShowNotifications(true)}
+            className="p-2 text-slate-600 relative"
+            aria-label="Notifications"
+          >
             <Bell className="w-5 h-5" />
+            {friendRequests.length > 0 && (
+              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+            )}
           </button>
           <button
             type="button"
@@ -284,11 +366,92 @@ export default function HomeFeedScreen() {
               />
             </div>
             {searchQuery ? (
-              <p className="text-slate-500 text-center py-8">No results found</p>
+              <div className="space-y-4">
+                {searchingUsers ? (
+                  <p className="text-center text-slate-500 py-4">Searching...</p>
+                ) : searchResults.length > 0 ? (
+                  searchResults.map(u => (
+                    <div key={u.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold">
+                          {u.full_name?.[0] || u.email[0].toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm">{u.full_name || "User"}</p>
+                          <p className="text-xs text-slate-500 truncate max-w-[150px]">{u.email}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleAddFriend(u.id)}
+                        className="px-3 py-1.5 bg-green-500 text-white text-xs font-bold rounded-lg hover:bg-green-600 transition"
+                      >
+                        Add Friend
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-slate-500 text-center py-8">No users found</p>
+                )}
+              </div>
             ) : (
               <div className="text-center py-8 text-slate-400">
                 <p className="text-xl mb-2">🔍</p>
-                <p>Search for users or posts</p>
+                <p>Search for friends by name or email</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showNotifications && (
+        <div
+          className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4"
+          onClick={() => setShowNotifications(false)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold">Friend Requests</h2>
+              <button type="button" onClick={() => setShowNotifications(false)} className="text-2xl text-slate-500">
+                ×
+              </button>
+            </div>
+            {friendRequests.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                <p className="text-2xl mb-2">🎈</p>
+                <p>No new friend requests</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {friendRequests.map(req => (
+                  <div key={req.request_id} className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+                        {req.from_user_name[0]}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm">{req.from_user_name}</p>
+                        <p className="text-xs text-slate-500">wants to be your friend</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleRespondRequest(req.request_id, "accept")}
+                        className="flex-1 py-2 bg-green-500 text-white text-sm font-bold rounded-lg hover:bg-green-600 transition"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        onClick={() => handleRespondRequest(req.request_id, "decline")}
+                        className="flex-1 py-2 bg-slate-200 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-300 transition"
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
