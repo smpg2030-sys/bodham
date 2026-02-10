@@ -16,12 +16,15 @@ app.add_middleware(
 )
 
 from fastapi.staticfiles import StaticFiles
-from routes.upload import router as upload_router
+from routes.upload import router as upload_router, UPLOAD_DIR
 import os
 
 prefix = "/api" if os.getenv("VERCEL") else ""
 
-app.mount("/static", StaticFiles(directory="uploads"), name="static")
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=UPLOAD_DIR), name="static")
 
 app.include_router(auth_router, prefix=prefix)
 app.include_router(admin_router, prefix=prefix)
