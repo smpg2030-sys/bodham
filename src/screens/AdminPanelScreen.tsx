@@ -166,9 +166,18 @@ export default function AdminPanelScreen() {
             <div className="divide-y divide-slate-100">
               {users.map((u) => (
                 <div key={u.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition">
-                  <div>
-                    <div className="font-semibold text-slate-800">{u.full_name || "Unknown"}</div>
-                    <div className="text-xs text-slate-500">{u.email}</div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold overflow-hidden">
+                      {u.profile_pic ? (
+                        <img src={u.profile_pic} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        u.full_name?.[0] || u.email[0].toUpperCase()
+                      )}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-slate-800">{u.full_name || "Unknown"}</div>
+                      <div className="text-xs text-slate-500">{u.email}</div>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-[10px] font-bold uppercase tracking-tighter px-2 py-1 rounded ${u.role === 'admin' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -193,9 +202,13 @@ export default function AdminPanelScreen() {
               <div key={post.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-2">
-                    <span className="w-8 h-8 flex items-center justify-center bg-blue-100 text-blue-600 rounded-full text-xs font-bold">
-                      {post.author_name ? post.author_name[0] : "?"}
-                    </span>
+                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs overflow-hidden">
+                      {post.author_profile_pic ? (
+                        <img src={post.author_profile_pic} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        post.author_name ? post.author_name[0] : "?"
+                      )}
+                    </div>
                     <div>
                       <p className="font-semibold text-sm">{post.author_name}</p>
                       {post.author_email && <p className="text-xs text-slate-500">{post.author_email}</p>}

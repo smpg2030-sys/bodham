@@ -46,7 +46,8 @@ def search_users(query: str, current_user_id: str):
             email=user["email"],
             full_name=user.get("full_name"),
             role=user.get("role", "user"),
-            is_verified=True
+            is_verified=user.get("is_verified", False),
+            profile_pic=user.get("profile_pic")
         ))
     return results
 

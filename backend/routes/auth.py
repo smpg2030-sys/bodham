@@ -107,7 +107,8 @@ def verify_otp(data: OTPVerify):
         email=user["email"],
         full_name=user.get("full_name"),
         role=user.get("role", "user"),
-        is_verified=True
+        is_verified=True,
+        profile_pic=user.get("profile_pic")
     )
 
 @router.post("/login", response_model=UserResponse)
@@ -128,7 +129,8 @@ def login(data: UserLogin):
         email=user["email"],
         full_name=user.get("full_name") or None,
         role=user.get("role", "user"),
-        is_verified=True
+        is_verified=True,
+        profile_pic=user.get("profile_pic")
     )
 
 @router.get("/user/{user_id}", response_model=UserResponse)
@@ -151,5 +153,39 @@ def get_user(user_id: str):
         email=user["email"],
         full_name=user.get("full_name"),
         role=user.get("role", "user"),
-        is_verified=user.get("is_verified", False)
+        is_verified=user.get("is_verified", False),
+        profile_pic=user.get("profile_pic")
+    )
+
+class ProfilePicUpdate(BaseModel):
+    profile_pic: str # Base64 string
+
+@router.put("/user/{user_id}/profile-pic", response_model=UserResponse)
+def update_profile_pic(user_id: str, data: ProfilePicUpdate):
+    db = get_db()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    from bson import ObjectId
+    try:
+        oid = ObjectId(user_id)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid User ID")
+    
+    result = db.users.find_one_and_update(
+        {"_id": oid},
+        {"$set": {"profile_pic": data.profile_pic}},
+        return_document=True
+    )
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return UserResponse(
+        id=str(result["_id"]),
+        email=result["email"],
+        full_name=result.get("full_name"),
+        role=result.get("role", "user"),
+        is_verified=result.get("is_verified", False),
+        profile_pic=result.get("profile_pic")
     )

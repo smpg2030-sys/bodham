@@ -19,6 +19,7 @@ class UserResponse(BaseModel):
     role: str = "user"
     full_name: str | None = None
     is_verified: bool = False
+    profile_pic: str | None = None
 
 
 class PostCreate(BaseModel):
@@ -31,6 +32,7 @@ class PostResponse(BaseModel):
     user_id: str
     author_name: str
     author_email: str | None = None
+    author_profile_pic: str | None = None
     content: str
     image_url: str | None = None
     status: str  # "pending", "approved", "rejected"

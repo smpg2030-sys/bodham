@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { LogOut, Settings, ChevronRight, User, Shield, Trash2, MoreVertical } from "lucide-react";
+import { LogOut, Settings, Shield, Trash2, MoreVertical } from "lucide-react";
 import { Post } from "../types";
 
 const getApiBase = () => {
@@ -17,10 +17,13 @@ export default function ProfileScreen() {
   const { user, logout, setUser } = useAuth();
   const [activeTab, setActiveTab] = useState<"posts" | "saved">("posts");
   const [showSettings, setShowSettings] = useState(false);
+  const [myPosts, setMyPosts] = useState<Post[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
       refreshUserRole();
+      fetchMyPosts();
     }
   }, [user?.id]);
 
@@ -29,8 +32,7 @@ export default function ProfileScreen() {
       const res = await fetch(`${API_BASE}/auth/user/${user?.id}`);
       if (res.ok) {
         const freshUser = await res.json();
-        // Only update if role changed (to avoid loops, though useEffect deps handles most)
-        if (freshUser.role !== user?.role) {
+        if (JSON.stringify(freshUser) !== JSON.stringify(user)) {
           setUser(freshUser);
         }
       }
@@ -38,17 +40,6 @@ export default function ProfileScreen() {
       console.error("User refresh failed", e);
     }
   };
-
-  const [myPosts, setMyPosts] = useState<Post[]>([]);
-  const [loadingPosts, setLoadingPosts] = useState(false);
-
-  const isAdmin = user?.role === "admin";
-
-  useEffect(() => {
-    if (user) {
-      fetchMyPosts();
-    }
-  }, [user]);
 
   const fetchMyPosts = async () => {
     setLoadingPosts(true);
@@ -64,8 +55,6 @@ export default function ProfileScreen() {
       setLoadingPosts(false);
     }
   };
-
-
 
   const handleDeletePost = async (postId: string) => {
     if (!confirm("Are you sure you want to delete this post?")) return;
@@ -83,6 +72,36 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleProfilePicUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0] && user) {
+      const file = e.target.files[0];
+      try {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = error => reject(error);
+        });
+
+        const res = await fetch(`${API_BASE}/auth/user/${user.id}/profile-pic`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profile_pic: base64 }),
+        });
+
+        if (res.ok) {
+          const updatedUser = await res.json();
+          setUser(updatedUser);
+        } else {
+          alert("Failed to upload profile picture");
+        }
+      } catch (error) {
+        console.error("Profile pic upload error", error);
+        alert("Error uploading profile picture");
+      }
+    }
+  };
+
   const getStatusBadge = (post: Post) => {
     switch (post.status) {
       case "approved":
@@ -95,6 +114,8 @@ export default function ProfileScreen() {
   };
 
   if (!user) return null;
+
+  const isAdmin = user?.role === "admin";
 
   return (
     <div className="app-container min-h-screen bg-[#f8f9fa] pb-20">
@@ -116,12 +137,16 @@ export default function ProfileScreen() {
       <div className="p-4 pt-6 pb-4">
         <div className="flex flex-col items-center text-center mb-6">
           <div className="relative inline-block">
-            <div className="w-24 h-24 rounded-full mx-auto mb-3 bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-3xl font-bold text-white">
-              {user.full_name?.[0] || user.email[0].toUpperCase()}
+            <div className="w-24 h-24 rounded-full mx-auto mb-3 bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-3xl font-bold text-white overflow-hidden shadow-lg border-2 border-white">
+              {user.profile_pic ? (
+                <img src={user.profile_pic} alt="" className="w-full h-full object-cover" />
+              ) : (
+                user.full_name?.[0] || user.email[0].toUpperCase()
+              )}
             </div>
-            <label className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-sm cursor-pointer">
-              <input type="file" accept="image/*" className="hidden" />
-              <span className="text-sm">+</span>
+            <label className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-green-500 shadow-sm border border-white flex items-center justify-center text-white text-sm cursor-pointer hover:bg-green-600 transition">
+              <input type="file" accept="image/*" className="hidden" onChange={handleProfilePicUpload} />
+              <span className="text-sm font-bold">+</span>
             </label>
           </div>
           <h2 className="text-2xl font-bold text-slate-800">
@@ -132,7 +157,7 @@ export default function ProfileScreen() {
             <span className="text-slate-400 text-[10px] uppercase font-bold tracking-tighter bg-slate-100 px-2 py-0.5 rounded">
               {user.role}
             </span>
-            {user.is_verified && (
+            {user.profile_pic && (
               <span className="text-emerald-600 text-[10px] uppercase font-bold tracking-tighter bg-emerald-50 px-2 py-0.5 rounded">
                 Verified
               </span>
@@ -272,7 +297,6 @@ export default function ProfileScreen() {
                 <span className="flex items-center gap-3">👤 Change user name</span>
                 <span>→</span>
               </button>
-              {/* ... other settings ... */}
               <button
                 type="button"
                 onClick={() => {

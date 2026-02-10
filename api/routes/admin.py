@@ -24,6 +24,9 @@ def get_all_users(role: str | None = None):
         all_users.append(UserResponse(
             id=str(user["_id"]),
             email=user["email"],
+            role=user.get("role", "user"),
+            is_verified=user.get("is_verified", False),
+            profile_pic=user.get("profile_pic"),
             full_name=user.get("full_name") or None
         ))
     return all_users
@@ -85,11 +88,16 @@ def get_posts(status: str = "pending", role: str | None = None):
     if user_ids:
         users = db.users.find({"_id": {"$in": list(user_ids)}})
         for u in users:
-            users_map[str(u["_id"])] = u["email"]
+            users_map[str(u["_id"])] = {
+                "email": u["email"],
+                "profile_pic": u.get("profile_pic")
+            }
             
-    # Attach emails
+    # Attach emails and profile pics
     for post in posts:
-        post["author_email"] = users_map.get(post["user_id"])
+        user_info = users_map.get(post["user_id"], {})
+        post["author_email"] = user_info.get("email")
+        post["author_profile_pic"] = user_info.get("profile_pic")
         results.append(post)
         
     return results

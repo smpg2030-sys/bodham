@@ -24,7 +24,10 @@ def get_all_users(role: str | None = None):
         all_users.append(UserResponse(
             id=str(user["_id"]),
             email=user["email"],
-            full_name=user.get("full_name") or None
+            full_name=user.get("full_name") or None,
+            role=user.get("role", "user"),
+            is_verified=user.get("is_verified", False),
+            profile_pic=user.get("profile_pic")
         ))
     return all_users
 
@@ -73,6 +76,7 @@ def get_posts(role: str, status: str = "all"):
         user = db.users.find_one({"_id": ObjectId(doc["user_id"])})
         if user:
             doc["author_email"] = user.get("email")
+            doc["author_profile_pic"] = user.get("profile_pic")
         results.append(doc)
     return results
 

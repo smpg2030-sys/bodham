@@ -4,6 +4,7 @@ export interface User {
     full_name: string | null;
     role: string;
     is_verified?: boolean;
+    profile_pic?: string | null;
 }
 
 export interface Post {
@@ -16,4 +17,5 @@ export interface Post {
     status: "pending" | "approved" | "rejected";
     created_at: string;
     rejection_reason?: string;
+    author_profile_pic?: string | null;
 }

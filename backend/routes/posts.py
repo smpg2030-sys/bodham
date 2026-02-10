@@ -52,6 +52,10 @@ def get_feed(user_id: str | None = None):
     results = []
     for doc in posts_cursor:
         doc["id"] = str(doc["_id"])
+        # Fetch author profile pic
+        author = db.users.find_one({"_id": ObjectId(doc["user_id"])})
+        if author:
+            doc["author_profile_pic"] = author.get("profile_pic")
         results.append(doc)
     return results
 
@@ -65,6 +69,10 @@ def get_my_posts(user_id: str):
     approved_posts = list(db.posts.find({"user_id": user_id}))
     pending_posts = list(db.pending_posts.find({"user_id": user_id}))
     
+    # Fetch user for profile pic
+    user = db.users.find_one({"_id": ObjectId(user_id)})
+    profile_pic = user.get("profile_pic") if user else None
+
     combined_posts = approved_posts + pending_posts
     # Sort by newest first
     combined_posts.sort(key=lambda x: x.get("created_at", ""), reverse=True)
@@ -72,6 +80,7 @@ def get_my_posts(user_id: str):
     results = []
     for doc in combined_posts:
         doc["id"] = str(doc["_id"])
+        doc["author_profile_pic"] = profile_pic
         results.append(doc)
     return results
 

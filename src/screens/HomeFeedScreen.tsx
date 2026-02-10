@@ -150,7 +150,6 @@ export default function HomeFeedScreen() {
         });
       }
 
-      // Fix: Use template literal instead of URL object to avoid Vercel relative URL issues
       const queryParams = new URLSearchParams({
         user_id: user.id || "",
         author_name: user.full_name || user.email || ""
@@ -187,9 +186,13 @@ export default function HomeFeedScreen() {
       <header className="sticky top-0 z-10 bg-white border-b border-slate-100 px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div
-            className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-white font-semibold bg-gradient-to-br from-green-400 to-green-600"
+            className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-white font-semibold bg-gradient-to-br from-green-400 to-green-600 overflow-hidden shadow-sm"
           >
-            {user?.full_name?.[0] || user?.email?.[0]?.toUpperCase() || "M"}
+            {user?.profile_pic ? (
+              <img src={user.profile_pic} alt="" className="w-full h-full object-cover" />
+            ) : (
+              user?.full_name?.[0] || user?.email?.[0]?.toUpperCase() || "M"
+            )}
           </div>
           <h1 className="text-xl font-bold text-slate-800">MindRise</h1>
         </div>
@@ -251,8 +254,12 @@ export default function HomeFeedScreen() {
           posts.map(post => (
             <div key={post.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
-                  {post.author_name[0]}
+                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs overflow-hidden">
+                  {post.author_profile_pic ? (
+                    <img src={post.author_profile_pic} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    post.author_name[0]
+                  )}
                 </div>
                 <div>
                   <p className="font-semibold text-sm">{post.author_name}</p>
@@ -373,8 +380,12 @@ export default function HomeFeedScreen() {
                   searchResults.map(u => (
                     <div key={u.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold">
-                          {u.full_name?.[0] || u.email[0].toUpperCase()}
+                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold overflow-hidden">
+                          {u.profile_pic ? (
+                            <img src={u.profile_pic} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            u.full_name?.[0] || u.email[0].toUpperCase()
+                          )}
                         </div>
                         <div>
                           <p className="font-semibold text-sm">{u.full_name || "User"}</p>
