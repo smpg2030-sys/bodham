@@ -17,9 +17,20 @@ const EBOOKS = [
   { title: "Calm Mind Journey", author: "Sarah Miller", cover: "📔", price: "Premium" },
 ];
 
+const COMMUNITY_STORIES = [
+  {
+    title: "Indian AI Reading Document",
+    source: "The Better India",
+    link: "https://thebetterindia.com/innovation/indian-ai-document-reading-sarvam-gemini-openai-language-tests-11092770",
+    cover: "🤖",
+    description: "How Sarvam AI is breaking language barriers in document reading."
+  }
+];
+
 export default function ExploreScreen() {
   const navigate = useNavigate();
   const [showEbooks, setShowEbooks] = useState(false);
+  const [showCommunity, setShowCommunity] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [hasEbookAccess, setHasEbookAccess] = useState(false);
 
@@ -74,7 +85,10 @@ export default function ExploreScreen() {
             <button
               key={cat.title}
               type="button"
-              onClick={() => cat.title === "E-Books" && setShowEbooks(true)}
+              onClick={() => {
+                if (cat.title === "E-Books") setShowEbooks(true);
+                if (cat.title === "Community") setShowCommunity(true);
+              }}
               className={`${cat.bg} rounded-xl p-6 text-left transition hover:opacity-90`}
             >
               <span className="text-3xl block mb-2">{cat.icon}</span>
@@ -84,6 +98,50 @@ export default function ExploreScreen() {
           ))}
         </div>
       </div>
+
+      {showCommunity && (
+        <div
+          className="fixed inset-0 bg-black/50 z-[100] flex items-end sm:items-center justify-center p-4"
+          onClick={() => setShowCommunity(false)}
+        >
+          <div
+            className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-xl font-bold">Community Stories</h2>
+              <button type="button" onClick={() => setShowCommunity(false)} className="text-2xl text-slate-500">
+                ×
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              {COMMUNITY_STORIES.map((story, i) => (
+                <div key={i} className="bg-slate-50 rounded-2xl p-4 flex flex-col gap-3">
+                  <div className="flex gap-4">
+                    <span className="text-4xl p-3 bg-white rounded-xl shadow-sm">{story.cover}</span>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-slate-800 text-lg leading-tight">{story.title}</h3>
+                      <p className="text-sm text-slate-500 mt-1">{story.source}</p>
+                    </div>
+                  </div>
+                  <p className="text-slate-600 text-sm">{story.description}</p>
+                  <a
+                    href={story.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3 bg-violet-600 text-white text-center rounded-xl font-semibold hover:bg-violet-700 transition mt-2"
+                  >
+                    Read Story
+                  </a>
+                </div>
+              ))}
+              <div className="text-center py-6 text-slate-400">
+                <p className="text-sm">More stories coming soon!</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showEbooks && (
         <div
