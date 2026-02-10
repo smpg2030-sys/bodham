@@ -26,49 +26,62 @@ function LoginRedirect() {
   return <LoginScreen />;
 }
 
+import { AnimatePresence } from "framer-motion";
+import { useLocation } from "react-router-dom";
+
+function AppRoutes() {
+  const location = useLocation();
+
+  return (
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        <Route path="/welcome" element={<WelcomeScreen />} />
+        <Route path="/goals" element={<GoalsScreen />} />
+        <Route path="/login" element={<LoginRedirect />} />
+        <Route path="/verify" element={<VerifyOTPScreen />} />
+        <Route
+          path="/support"
+          element={
+            <ProtectedRoute>
+              <TherapistSupportScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminPanelScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <InnerApp />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<HomeFeedScreen />} />
+          <Route path="explore" element={<ExploreScreen />} />
+          <Route path="messages" element={<MessagingScreen />} />
+          <Route path="focus" element={<MindRoomsScreen />} />
+          <Route path="profile" element={<ProfileScreen />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/welcome" replace />} />
+      </Routes>
+    </AnimatePresence>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <div className="min-h-screen flex flex-col items-center bg-[#f8f9fa]">
-          <div className="w-full max-w-[430px] min-h-screen flex flex-col app-container">
-            <Routes>
-              <Route path="/welcome" element={<WelcomeScreen />} />
-              <Route path="/goals" element={<GoalsScreen />} />
-              <Route path="/login" element={<LoginRedirect />} />
-              <Route path="/verify" element={<VerifyOTPScreen />} />
-              <Route
-                path="/support"
-                element={
-                  <ProtectedRoute>
-                    <TherapistSupportScreen />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute>
-                    <AdminPanelScreen />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <InnerApp />
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<HomeFeedScreen />} />
-                <Route path="explore" element={<ExploreScreen />} />
-                <Route path="messages" element={<MessagingScreen />} />
-                <Route path="focus" element={<MindRoomsScreen />} />
-                <Route path="profile" element={<ProfileScreen />} />
-              </Route>
-              <Route path="*" element={<Navigate to="/welcome" replace />} />
-            </Routes>
+          <div className="w-full max-w-[480px] min-h-screen flex flex-col app-container relative bg-surface-50 shadow-2xl overflow-hidden">
+            <AppRoutes />
           </div>
         </div>
       </AuthProvider>
