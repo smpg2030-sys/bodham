@@ -9,15 +9,13 @@ router = APIRouter(prefix="/friends", tags=["friends"])
 
 @router.get("/search", response_model=List[UserResponse])
 def search_users(query: str, current_user_id: str):
-    print(f"DEBUG: Searching for '{query}' by user '{current_user_id}'")
     db = get_db()
-    if not db:
+    if db is None:
          raise HTTPException(status_code=503, detail="Database not available")
     
     try:
         user_oid = ObjectId(current_user_id)
     except:
-        print(f"DEBUG: Invalid current_user_id: {current_user_id}")
         user_oid = None
 
     query_filter = {
@@ -35,21 +33,7 @@ def search_users(query: str, current_user_id: str):
     if user_oid:
         query_filter["$and"].append({"_id": {"$ne": user_oid}})
     
-    print(f"DEBUG: Query filter: {query_filter}")
     users_cursor = db.users.find(query_filter).limit(20)
-    
-    results = []
-    for user in users_cursor:
-        print(f"DEBUG: Found user: {user.get('email')}")
-        results.append(UserResponse(
-            id=str(user["_id"]),
-            email=user["email"],
-            full_name=user.get("full_name"),
-            role=user.get("role", "user"),
-            is_verified=True
-        ))
-    print(f"DEBUG: Returning {len(results)} results")
-    return results
     
     results = []
     for user in users_cursor:
@@ -65,7 +49,7 @@ def search_users(query: str, current_user_id: str):
 @router.post("/request")
 def send_friend_request(from_user_id: str, to_user_id: str):
     db = get_db()
-    if not db:
+    if db is None:
          raise HTTPException(status_code=503, detail="Database not available")
     
     if from_user_id == to_user_id:
@@ -101,7 +85,7 @@ def send_friend_request(from_user_id: str, to_user_id: str):
 @router.get("/requests")
 def get_friend_requests(user_id: str):
     db = get_db()
-    if not db:
+    if db is None:
          raise HTTPException(status_code=503, detail="Database not available")
     
     requests_cursor = db.friend_requests.find({
@@ -125,7 +109,7 @@ def get_friend_requests(user_id: str):
 @router.post("/respond")
 def respond_to_request(request_id: str, action: str): # action: "accept" or "decline"
     db = get_db()
-    if not db:
+    if db is None:
          raise HTTPException(status_code=503, detail="Database not available")
     
     req = db.friend_requests.find_one({"_id": ObjectId(request_id)})
@@ -148,7 +132,7 @@ def respond_to_request(request_id: str, action: str): # action: "accept" or "dec
 @router.get("/list")
 def list_friends(user_id: str):
     db = get_db()
-    if not db:
+    if db is None:
          raise HTTPException(status_code=503, detail="Database not available")
     
     friendships = db.friendships.find({
