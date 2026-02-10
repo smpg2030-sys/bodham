@@ -67,18 +67,27 @@ export default function LoginScreen() {
         return;
       }
 
+      // Registration success
       setMessage({
         type: "success",
-        text: "Account created successfully. Please sign in.",
+        text: "Code sent! Redirecting to verify...",
       });
+      setTimeout(() => navigate("/verify", { state: { email } }), 1000);
 
-      setMode("login");
-      setPassword("");
     } catch (err: any) {
-      setMessage({
-        type: "error",
-        text: err.message || "Network error. Please try again.",
-      });
+      if (err.message.includes("Email not verified")) {
+        // Allow redirect to verify
+        setMessage({
+          type: "error",
+          text: "Account not verified. Redirecting...",
+        });
+        setTimeout(() => navigate("/verify", { state: { email } }), 1500);
+      } else {
+        setMessage({
+          type: "error",
+          text: err.message || "Network error. Please try again.",
+        });
+      }
       setPassword("");
     } finally {
       setLoading(false);

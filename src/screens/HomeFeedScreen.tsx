@@ -1,9 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Bell } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { Post } from "../types";
 
 const TABS = ["All Posts", "Daily Quotes", "Gratitude"] as const;
+
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.DEV ? "http://localhost:8000" : "/api"); // Ensure consistency
 
 export default function HomeFeedScreen() {
   const navigate = useNavigate();
@@ -13,6 +18,76 @@ export default function HomeFeedScreen() {
   const [showSearch, setShowSearch] = useState(false);
   const [postContent, setPostContent] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const fetchPosts = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/posts/`);
+      if (res.ok) {
+        const data = await res.json();
+        setPosts(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch posts", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreatePost = async () => {
+    if (!postContent.trim() || !user) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/posts/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Ideally we should send a token, but for now passing user_id as per backend implementation
+        // We need to pass user_id and author_name as query params or body? 
+        // Backend definition: create_post(post: PostCreate, user_id: str, author_name: str)
+        // FastAPI defaults to query params for scalar types not in Pydantic model.
+        // Let's check backend/routes/posts.py again. create_post uses DI? No, just args.
+        // So params: ?user_id=...&author_name=...
+        body: JSON.stringify({ content: postContent }),
+      });
+
+      // Wait, I need to send user_id and author_name. 
+      // If I send JSON body, it maps to `post: PostCreate`. 
+      // `user_id` and `author_name` are separate arguments, so they are Query parameters by default in FastAPI.
+      // I should update the fetch call to include them in URL.
+      // Re-reading backend/routes/posts.py:
+      // def create_post(post: PostCreate, user_id: str, author_name: str):
+      // Yes, they are query params.
+
+      const url = new URL(`${API_BASE}/posts/`);
+      url.searchParams.append("user_id", user.id);
+      url.searchParams.append("author_name", user.full_name || user.email);
+
+      const response = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: postContent }),
+      });
+
+      if (response.ok) {
+        alert("Post submitted for review! ✅");
+        setPostContent("");
+        setShowNewPost(false);
+        // We don't refresh feed because it only shows approved posts.
+      } else {
+        alert("Failed to submit post.");
+      }
+    } catch (error) {
+      console.error("Error creating post", error);
+      alert("Error submitting post.");
+    }
+  };
 
   return (
     <div className="app-container min-h-screen bg-[#f8f9fa] pb-20">
@@ -53,22 +128,40 @@ export default function HomeFeedScreen() {
             key={tab}
             type="button"
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
-              activeTab === tab ? "bg-green-500 text-white" : "bg-white text-slate-600 border border-slate-200"
-            }`}
+            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${activeTab === tab ? "bg-green-500 text-white" : "bg-white text-slate-600 border border-slate-200"
+              }`}
           >
             {tab}
           </button>
         ))}
       </div>
 
-      <div className="p-4">
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <p className="text-xl text-slate-400 mb-2">No posts yet</p>
-          <p className="text-slate-500 text-sm">
-            Be the first to share your mindful moment!
-          </p>
-        </div>
+      <div className="p-4 space-y-4">
+        {loading ? (
+          <p className="text-center text-slate-500 py-8">Loading posts...</p>
+        ) : posts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <p className="text-xl text-slate-400 mb-2">No posts yet</p>
+            <p className="text-slate-500 text-sm">
+              Be the first to share your mindful moment!
+            </p>
+          </div>
+        ) : (
+          posts.map(post => (
+            <div key={post.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
+                  {post.author_name[0]}
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">{post.author_name}</p>
+                  <p className="text-xs text-slate-400">{new Date(post.created_at).toLocaleDateString()}</p>
+                </div>
+              </div>
+              <p className="text-slate-700">{post.content}</p>
+            </div>
+          ))
+        )}
       </div>
 
       {showNewPost && (
@@ -87,13 +180,7 @@ export default function HomeFeedScreen() {
               <h2 className="text-xl font-bold">New Post</h2>
               <button
                 type="button"
-                onClick={() => {
-                  if (postContent.trim()) {
-                    alert("Post submitted for review! ✅");
-                    setPostContent("");
-                    setShowNewPost(false);
-                  }
-                }}
+                onClick={handleCreatePost}
                 className="px-6 py-2 rounded-xl font-semibold text-white bg-gradient-to-r from-green-400 to-green-600"
               >
                 Post

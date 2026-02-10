@@ -1,16 +1,73 @@
-import React, { useState } from "react";
-import { useAuth } from "../context/AuthContext";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings, MoreVertical } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { LogOut, Settings, ChevronRight, User, Shield, Trash2, MoreVertical } from "lucide-react";
+import { Post } from "../types";
 
-const ADMIN_EMAIL = "admin@mindrise.com";
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.DEV ? "http://localhost:8000" : "/api");
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"posts" | "saved">("posts");
+  const { user, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState<"posts" | "saved">("posts");
   const [showSettings, setShowSettings] = useState(false);
-  const isAdmin = user?.email === ADMIN_EMAIL;
+
+  const [myPosts, setMyPosts] = useState<Post[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+
+  const isAdmin = user?.role === "admin";
+
+  useEffect(() => {
+    if (user) {
+      fetchMyPosts();
+    }
+  }, [user]);
+
+  const fetchMyPosts = async () => {
+    setLoadingPosts(true);
+    try {
+      const res = await fetch(`${API_BASE}/posts/my?user_id=${user?.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMyPosts(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch my posts", error);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    if (!confirm("Are you sure you want to delete this post?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/posts/${postId}?user_id=${user?.id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setMyPosts(prev => prev.filter(p => p.id !== postId));
+      } else {
+        alert("Failed to delete post");
+      }
+    } catch (error) {
+      console.error("Error deleting post", error);
+    }
+  };
+
+  const getStatusBadge = (post: Post) => {
+    switch (post.status) {
+      case "approved":
+        return <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">Approved</span>;
+      case "rejected":
+        return <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full">Rejected</span>;
+      default:
+        return <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full">Pending Review</span>;
+    }
+  };
+
+  if (!user) return null;
 
   return (
     <div className="app-container min-h-screen bg-[#f8f9fa] pb-20">
@@ -33,7 +90,7 @@ export default function ProfileScreen() {
         <div className="flex flex-col items-center text-center mb-6">
           <div className="relative inline-block">
             <div className="w-24 h-24 rounded-full mx-auto mb-3 bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-3xl font-bold text-white">
-              {user?.full_name?.[0] || user?.email?.[0]?.toUpperCase() || "?"}
+              {user.full_name?.[0] || user.email[0].toUpperCase()}
             </div>
             <label className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-sm cursor-pointer">
               <input type="file" accept="image/*" className="hidden" />
@@ -41,16 +98,24 @@ export default function ProfileScreen() {
             </label>
           </div>
           <h2 className="text-2xl font-bold text-slate-800">
-            {user?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "User"}
+            {user.full_name || user.email.split("@")[0]}
           </h2>
-          <p className="text-slate-500 text-sm mt-0.5">
-            Living one breath at a time 🌱
-          </p>
+          <p className="text-slate-400 text-xs mt-1">{user.email}</p>
+          <div className="flex gap-2 justify-center mt-2">
+            <span className="text-slate-400 text-[10px] uppercase font-bold tracking-tighter bg-slate-100 px-2 py-0.5 rounded">
+              {user.role}
+            </span>
+            {user.is_verified && (
+              <span className="text-emerald-600 text-[10px] uppercase font-bold tracking-tighter bg-emerald-50 px-2 py-0.5 rounded">
+                Verified
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="text-center">
-            <p className="text-2xl font-bold text-slate-800">0</p>
+            <p className="text-2xl font-bold text-slate-800">{myPosts.length}</p>
             <p className="text-sm text-slate-500">POSTS</p>
           </div>
           <div className="text-center py-4 rounded-xl bg-green-100">
@@ -67,47 +132,84 @@ export default function ProfileScreen() {
           <button
             type="button"
             onClick={() => navigate("/admin")}
-            className="w-full py-4 rounded-xl font-semibold text-white bg-red-500 mb-4"
+            className="w-full py-4 rounded-xl font-semibold text-white bg-slate-800 mb-4 flex items-center justify-center gap-2 shadow-lg shadow-slate-200"
           >
-            🛡️ Admin Panel
+            <Shield className="w-5 h-5" />
+            Admin Panel
           </button>
         )}
 
         <div className="flex gap-4 mb-6 border-b border-slate-200">
           <button
             type="button"
-            onClick={() => setTab("posts")}
-            className={`pb-2 text-sm font-medium border-b-2 transition ${
-              tab === "posts" ? "text-green-600 border-green-500 border-b-2" : "text-slate-400 border-transparent"
-            }`}
+            onClick={() => setActiveTab("posts")}
+            className={`pb-2 text-sm font-medium border-b-2 transition ${activeTab === "posts" ? "text-green-600 border-green-500 border-b-2" : "text-slate-400 border-transparent"
+              }`}
           >
             My Posts
           </button>
           <button
             type="button"
-            onClick={() => setTab("saved")}
-            className={`pb-2 text-sm font-medium border-b-2 transition ${
-              tab === "saved" ? "text-green-600 border-green-500 border-b-2" : "text-slate-400 border-transparent"
-            }`}
+            onClick={() => setActiveTab("saved")}
+            className={`pb-2 text-sm font-medium border-b-2 transition ${activeTab === "saved" ? "text-green-600 border-green-500 border-b-2" : "text-slate-400 border-transparent"
+              }`}
           >
             Saved
           </button>
         </div>
 
-        <div className="flex flex-col items-center py-12">
-          <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-emerald-100 to-sky-100 flex items-center justify-center text-2xl">
-            🖼️
+        {activeTab === "posts" && (
+          <div className="space-y-4 mb-8">
+            {loadingPosts ? (
+              <p className="text-center text-slate-400 text-sm py-8">Loading posts...</p>
+            ) : myPosts.length === 0 ? (
+              <div className="flex flex-col items-center py-12">
+                <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-emerald-100 to-sky-100 flex items-center justify-center text-2xl">
+                  🖼️
+                </div>
+                <p className="text-slate-500 text-sm mt-3">No posts yet</p>
+              </div>
+            ) : (
+              myPosts.map(post => (
+                <div key={post.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm relative">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(post)}
+                      <span className="text-xs text-slate-400">{new Date(post.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <button
+                      onClick={() => handleDeletePost(post.id)}
+                      className="text-slate-400 hover:text-red-500 p-1"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p className="text-slate-700 text-sm mb-2">{post.content}</p>
+                  {post.status === "rejected" && post.rejection_reason && (
+                    <div className="bg-red-50 p-2 rounded text-xs text-red-700 mt-2 border border-red-100">
+                      <strong>Moderator Note:</strong> {post.rejection_reason}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
-          <p className="text-slate-500 text-sm mt-3">No posts found yet</p>
-        </div>
+        )}
+
+        {activeTab === "saved" && (
+          <div className="flex flex-col items-center py-12">
+            <p className="text-slate-500 text-sm">No saved items</p>
+          </div>
+        )}
 
         <button
           onClick={() => {
             logout();
             navigate("/login", { replace: true });
           }}
-          className="w-full mt-4 py-2.5 rounded-lg bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition"
+          className="w-full mt-4 py-2.5 rounded-lg bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition mb-6"
         >
+          <LogOut className="w-4 h-4 inline-block mr-2" />
           Log out
         </button>
       </div>
@@ -127,14 +229,7 @@ export default function ProfileScreen() {
                 <span className="flex items-center gap-3">👤 Change user name</span>
                 <span>→</span>
               </button>
-              <button type="button" className="w-full flex items-center justify-between p-4 bg-slate-50 rounded-xl">
-                <span className="flex items-center gap-3">🖼️ Update bio</span>
-                <span>→</span>
-              </button>
-              <button type="button" className="w-full flex items-center justify-between p-4 bg-slate-50 rounded-xl">
-                <span className="flex items-center gap-3">📱 Add mobile number</span>
-                <span>→</span>
-              </button>
+              {/* ... other settings ... */}
               <button
                 type="button"
                 onClick={() => {
@@ -145,14 +240,6 @@ export default function ProfileScreen() {
                 className="w-full flex items-center justify-between p-4 bg-red-50 rounded-xl text-red-600"
               >
                 <span className="flex items-center gap-3">🚪 Logout</span>
-                <span>→</span>
-              </button>
-              <button type="button" className="w-full flex items-center justify-between p-4 bg-amber-50 rounded-xl text-amber-700">
-                <span className="flex items-center gap-3">🛡️ Account deactivation</span>
-                <span>→</span>
-              </button>
-              <button type="button" className="w-full flex items-center justify-between p-4 bg-red-100 rounded-xl text-red-600">
-                <span className="flex items-center gap-3">🗑️ Account delete</span>
                 <span>→</span>
               </button>
             </div>

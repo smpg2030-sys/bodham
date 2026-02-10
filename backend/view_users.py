@@ -23,7 +23,7 @@ def view_users():
         print(f"ID: {user['_id']}")
         print(f"Name: {user.get('full_name', 'N/A')}")
         print(f"Email: {user['email']}")
-        print(f"Password Hash: {user['password_hash']} (Encrypted)")
+        print(f"Role: {user.get('role', 'user')}")
         print("-" * 30)
 
 if __name__ == "__main__":
