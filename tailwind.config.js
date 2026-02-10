@@ -29,7 +29,6 @@ export default {
           800: "#1e293b", // Dark Charcoal
           900: "#0f172a",
           950: "#020617",
-          variant: "#e7e0ec", // Material 3 Surface Variant
         },
         accent: {
           light: "#818cf8", // Indigo
@@ -40,15 +39,10 @@ export default {
       fontFamily: {
         sans: ['"Outfit"', 'sans-serif'],
       },
-      borderRadius: {
-        '4xl': '28px',
-        '5xl': '32px',
-      },
       boxShadow: {
         'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
         'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
         'premium': '0 10px 40px -10px rgba(0, 0, 0, 0.08)',
-        'float': '0 20px 50px -12px rgba(0, 0, 0, 0.15)',
       },
       animation: {
         'float': 'float 6s ease-in-out infinite',

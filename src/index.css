@@ -105,8 +105,7 @@ body {
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  /* Slightly wider for pill shape */
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -115,18 +114,9 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 9999px;
-  /* Pill shape */
-  border: 2px solid #f8fafc;
-  /* Adds padding effect */
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
-}
-
-::selection {
-  background: #d1fae5;
-  /* Soft Emerald */
-  color: #065f46;
 }
