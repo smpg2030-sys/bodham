@@ -38,8 +38,8 @@ def get_stats(role: str | None = None):
         raise HTTPException(status_code=503, detail="Database connection not established.")
     
     user_count = db.users.count_documents({})
-    # Count pending posts
-    pending_count = db.posts.count_documents({"status": "pending"})
+    # Count pending posts from the pending collection
+    pending_count = db.pending_posts.count_documents({"status": "pending"})
     
     return {
         "total_users": user_count,
@@ -55,11 +55,17 @@ def get_posts(status: str = "pending", role: str | None = None):
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established")
     
-    filter_query = {}
-    if status != "all":
-        filter_query["status"] = status
-
-    posts_cursor = db.posts.find(filter_query).sort("created_at", -1)
+    posts_cursor = []
+    if status == "approved":
+        posts_cursor = db.posts.find().sort("created_at", -1)
+    elif status == "pending" or status == "rejected":
+        posts_cursor = db.pending_posts.find({"status": status}).sort("created_at", -1)
+    else:  # status == "all"
+        approved = list(db.posts.find())
+        pending_rejected = list(db.pending_posts.find())
+        combined = approved + pending_rejected
+        combined.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        posts_cursor = combined
     results = []
     
     # Collect user IDs to batch fetch emails
@@ -104,16 +110,30 @@ def update_post_status(post_id: str, update: PostStatusUpdate, role: str | None 
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established")
         
-    update_data = {"status": update.status}
-    if update.status == "rejected":
-        update_data["rejection_reason"] = update.rejection_reason
+    if update.status == "approved":
+        # Move post from pending_posts to posts
+        post = db.pending_posts.find_one({"_id": ObjectId(post_id)})
+        if not post:
+            # Check if it's already approved (maybe a retry)
+            already_approved = db.posts.find_one({"_id": ObjectId(post_id)})
+            if already_approved:
+                return {"message": "Post already approved"}
+            raise HTTPException(status_code=404, detail="Post not found in pending")
         
-    result = db.posts.update_one(
-        {"_id": ObjectId(post_id)},
-        {"$set": update_data}
-    )
+        post["status"] = "approved"
+        db.posts.insert_one(post)
+        db.pending_posts.delete_one({"_id": ObjectId(post_id)})
+        return {"message": "Post approved and moved to live feed"}
     
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Post not found or status unchanged")
+    else:  # rejected
+        result = db.pending_posts.update_one(
+            {"_id": ObjectId(post_id)},
+            {"$set": {"status": "rejected", "rejection_reason": update.rejection_reason}}
+        )
         
-    return {"message": f"Post {update.status}"}
+        if result.matched_count == 0:
+            # If not in pending, maybe it was approved and we are trying to reject it?
+            # For now, let's just handle the transition from pending/rejected
+            raise HTTPException(status_code=404, detail="Post not found in pending moderation")
+            
+        return {"message": "Post rejected"}
