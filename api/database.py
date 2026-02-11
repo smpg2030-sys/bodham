@@ -7,6 +7,15 @@ from config import MONGO_URI, DB_NAME
 _client: MongoClient | None = None
 
 
+def init_db(db):
+    try:
+        # Create TTL index on notifications collection for 24-hour expiry
+        # expireAfterSeconds: 86400 (24 hours)
+        db.notifications.create_index("created_at", expireAfterSeconds=86400)
+        print("Initialized database indexes.")
+    except Exception as e:
+        print(f"Warning: Could not initialize database indexes: {e}")
+
 def get_client() -> MongoClient:
     global _client
     if _client is None:
@@ -19,6 +28,9 @@ def get_client() -> MongoClient:
             # Verify connection
             _client.admin.command('ping')
             print("Successfully connected to MongoDB.")
+            
+            # Initialize indexes
+            init_db(_client[DB_NAME])
         except (ConnectionFailure, ConfigurationError) as e:
             print(f"CRITICAL: Could not connect to MongoDB: {e}")
             # We don't exit here to allow the app to start, but routes will fail

@@ -77,6 +77,7 @@ function AppRoutes() {
           <Route path="messages" element={<MessagingScreen />} />
           <Route path="focus" element={<MindRoomsScreen />} />
           <Route path="profile" element={<ProfileScreen />} />
+          <Route path="profile/:userId" element={<ProfileScreen />} />
         </Route>
         <Route path="*" element={<Navigate to="/welcome" replace />} />
       </Routes>

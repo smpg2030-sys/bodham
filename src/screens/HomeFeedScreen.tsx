@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Bell, Plus, Image as ImageIcon, Camera, Wand2, Video as VideoIcon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { Post, Video } from "../types";
+import { Post, Video, FriendRequest, AppNotification } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
 import VideoPlayer from "../components/VideoPlayer";
 import GrowthTree from "../components/GrowthTree";
@@ -30,7 +30,8 @@ export default function HomeFeedScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchingUsers, setSearchingUsers] = useState(false);
-  const [friendRequests, setFriendRequests] = useState<any[]>([]);
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileBanner, setShowProfileBanner] = useState(false);
 
@@ -56,12 +57,8 @@ export default function HomeFeedScreen() {
           if (Array.isArray(data)) {
             setVideos(data);
           } else {
-            console.error("Expected array for videos, got:", data);
             setVideos([]);
           }
-        } else {
-          console.error("Failed to fetch videos, status:", res.status);
-          setVideos([]);
         }
       } else {
         const url = user ? `${API_BASE}/posts/?user_id=${user.id}` : `${API_BASE}/posts/`;
@@ -71,12 +68,8 @@ export default function HomeFeedScreen() {
           if (Array.isArray(data)) {
             setPosts(data);
           } else {
-            console.error("Expected array for posts, got:", data);
             setPosts([]);
           }
-        } else {
-          console.error("Failed to fetch posts, status:", res.status);
-          setPosts([]);
         }
       }
     } catch (error) {
@@ -101,11 +94,28 @@ export default function HomeFeedScreen() {
     }
   };
 
+  const fetchNotifications = async () => {
+    if (!user) return;
+    try {
+      const res = await fetch(`${API_BASE}/friends/notifications?user_id=${user.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data);
+      }
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
+    }
+  };
+
   useEffect(() => {
     fetchData();
     if (user) {
       fetchFriendRequests();
-      const interval = setInterval(fetchFriendRequests, 30000); // Poll every 30s
+      fetchNotifications();
+      const interval = setInterval(() => {
+        fetchFriendRequests();
+        fetchNotifications();
+      }, 30000); // Poll every 30s
       return () => clearInterval(interval);
     }
   }, [user, activeTab]);
@@ -274,7 +284,7 @@ export default function HomeFeedScreen() {
             aria-label="Notifications"
           >
             <Bell className="w-5 h-5" />
-            {friendRequests.length > 0 && (
+            {(friendRequests.length > 0 || notifications.length > 0) && (
               <span className="absolute top-2 right-2.5 w-2 h-2 bg-rose-500 rounded-full border border-white"></span>
             )}
           </button>
@@ -478,7 +488,7 @@ export default function HomeFeedScreen() {
                     }}
                     className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1.5 backdrop-blur-md opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <div className="text-xs">✕</div>
+                    <div className="text-xs"></div>
                   </button>
                 </div>
               )}
@@ -591,60 +601,104 @@ export default function HomeFeedScreen() {
       </AnimatePresence>
 
       {/* Notifications Modal */}
-      {showNotifications && (
-        <div
-          className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4"
-          onClick={() => setShowNotifications(false)}
-        >
-          <div
-            className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[80vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
+      <AnimatePresence>
+        {showNotifications && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={() => setShowNotifications(false)}
           >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold">Friend Requests</h2>
-              <button type="button" onClick={() => setShowNotifications(false)} className="text-2xl text-slate-500">
-                ×
-              </button>
-            </div>
-            {friendRequests.length === 0 ? (
-              <div className="text-center py-8 text-slate-400">
-                <p className="text-2xl mb-2">🎈</p>
-                <p>No new friend requests</p>
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              className="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md max-h-[80vh] overflow-y-auto shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-slate-800">Notifications</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowNotifications(false)}
+                  className="w-8 h-8 flex items-center justify-center bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 transition-colors"
+                >
+                  ✕
+                </button>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {friendRequests.map(req => (
-                  <div key={req.request_id} className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
-                        {req.from_user_name[0]}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-sm">{req.from_user_name}</p>
-                        <p className="text-xs text-slate-500">wants to be your friend</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleRespondRequest(req.request_id, "accept")}
-                        className="flex-1 py-2 bg-green-500 text-white text-sm font-bold rounded-lg hover:bg-green-600 transition"
-                      >
-                        Accept
-                      </button>
-                      <button
-                        onClick={() => handleRespondRequest(req.request_id, "decline")}
-                        className="flex-1 py-2 bg-slate-200 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-300 transition"
-                      >
-                        Decline
-                      </button>
-                    </div>
+
+              {friendRequests.length === 0 && notifications.length === 0 ? (
+                <div className="text-center py-12 text-slate-400">
+                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Bell className="w-8 h-8 text-slate-200" />
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+                  <p className="font-medium">No new notifications</p>
+                  <p className="text-sm">We'll let you know when something happens!</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Friend Requests Section */}
+                  {friendRequests.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-xs uppercase font-bold tracking-widest text-slate-400 px-1">Friend Requests</h3>
+                      {friendRequests.map(req => (
+                        <div key={req.request_id} className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold border border-emerald-200">
+                              {req.from_user_name[0].toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-800 text-sm">{req.from_user_name}</p>
+                              <p className="text-xs text-slate-500">sent you a friend request</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleRespondRequest(req.request_id, "accept")}
+                              className="flex-1 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition shadow-sm"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => handleRespondRequest(req.request_id, "decline")}
+                              className="flex-1 py-2.5 bg-white text-slate-600 text-xs font-bold rounded-xl border border-slate-200 hover:bg-slate-50 transition"
+                            >
+                              Ignore
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* General Notification History */}
+                  {notifications.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-xs uppercase font-bold tracking-widest text-slate-400 px-1">Recent Updates</h3>
+                      <div className="space-y-2">
+                        {notifications.map(n => (
+                          <div key={n.id} className="flex gap-4 p-3 hover:bg-slate-50 rounded-2xl transition-colors border border-transparent hover:border-slate-100">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-bold ${n.type === 'request_accepted' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-600'}`}>
+                              {n.type === 'request_accepted' ? '🤝' : '✨'}
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-slate-800 leading-tight mb-1">{n.message}</p>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+                                {new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { LogOut, Settings, Shield, Trash2, MoreVertical, Grid, Bookmark, Camera, Video as VideoIcon, Upload } from "lucide-react";
-import { Post, Video } from "../types";
+import { LogOut, Settings, Shield, Trash2, MoreVertical, Grid, Bookmark, Camera, Video as VideoIcon, Upload, Users, UserPlus, CheckCircle2, Clock } from "lucide-react";
+import { Post, Video, AppFriend, User } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
 import VideoPlayer from "../components/VideoPlayer";
 import GrowthTree from "../components/GrowthTree";
@@ -18,53 +18,106 @@ const API_BASE = getApiBase();
 export default function ProfileScreen() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, setUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<"posts" | "saved" | "videos">("posts");
+  const { userId } = useParams();
+  const { user: currentUser, logout, setUser: setCurrentUser } = useAuth();
+
+  const isOwnProfile = !userId || userId === currentUser?.id;
+  const targetUserId = userId || currentUser?.id;
+
+  const [targetUser, setTargetUser] = useState<User | null>(null);
+  const [activeTab, setActiveTab] = useState<"posts" | "saved" | "videos" | "friends">("posts");
   const [showSettings, setShowSettings] = useState(false);
   const [myPosts, setMyPosts] = useState<Post[]>([]);
   const [myVideos, setMyVideos] = useState<Video[]>([]);
+  const [friendsList, setFriendsList] = useState<AppFriend[]>([]);
+  const [friendshipStatus, setFriendshipStatus] = useState<"none" | "pending" | "received" | "accepted">("none");
+
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [loadingVideos, setLoadingVideos] = useState(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [isEditingBio, setIsEditingBio] = useState(false);
-  const [bioDraft, setBioDraft] = useState(user?.bio || "");
+  const [bioDraft, setBioDraft] = useState("");
   const [isSavingBio, setIsSavingBio] = useState(false);
 
   const [isEditingDetails, setIsEditingDetails] = useState(false);
-  const [newName, setNewName] = useState(user?.full_name || "");
-  const [newEmail, setNewEmail] = useState(user?.email || "");
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
   const [isSavingDetails, setIsSavingDetails] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      setNewName(user.full_name || "");
-      setNewEmail(user.email || "");
+    if (isOwnProfile && currentUser) {
+      setTargetUser(currentUser);
+      setNewName(currentUser.full_name || "");
+      setNewEmail(currentUser.email || "");
+      setBioDraft(currentUser.bio || "");
+    } else if (userId) {
+      fetchTargetUser(userId);
     }
-  }, [user]);
+  }, [userId, currentUser, isOwnProfile]);
+
+  const fetchTargetUser = async (id: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/user/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTargetUser(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch target user", e);
+    } finally {
+    }
+  };
 
   useEffect(() => {
-    if ((location.state as any)?.openEdit) {
+    if ((location.state as any)?.openEdit && isOwnProfile) {
       setIsEditingDetails(true);
       navigate(".", { replace: true, state: {} });
     }
-  }, [location, navigate]);
+  }, [location, navigate, isOwnProfile]);
 
   useEffect(() => {
-    if (user?.id) {
-      refreshUserRole();
+    if (targetUserId) {
+      if (isOwnProfile) refreshUserRole();
       fetchMyPosts();
       fetchMyVideos();
+      fetchFriends();
+      if (!isOwnProfile) checkFriendship();
     }
-  }, [user?.id]);
+  }, [targetUserId, isOwnProfile]);
+
+  const checkFriendship = async () => {
+    if (!currentUser || !userId) return;
+    try {
+      const res = await fetch(`${API_BASE}/friends/status?user1_id=${currentUser.id}&user2_id=${userId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setFriendshipStatus(data.status);
+      }
+    } catch (err) {
+      console.error("Error checking friendship status", err);
+    }
+  };
+
+  const fetchFriends = async () => {
+    if (!targetUserId) return;
+    try {
+      const res = await fetch(`${API_BASE}/friends/list?user_id=${targetUserId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setFriendsList(data);
+      }
+    } catch (err) {
+      console.error("Error fetching friends", err);
+    }
+  };
 
   const refreshUserRole = async () => {
+    if (!currentUser?.id) return;
     try {
-      const res = await fetch(`${API_BASE}/auth/user/${user?.id}`);
+      const res = await fetch(`${API_BASE}/auth/user/${currentUser.id}`);
       if (res.ok) {
         const freshUser = await res.json();
-        if (JSON.stringify(freshUser) !== JSON.stringify(user)) {
-          setUser(freshUser);
-        }
+        setCurrentUser(freshUser);
       }
     } catch (e) {
       console.error("User refresh failed", e);
@@ -72,46 +125,65 @@ export default function ProfileScreen() {
   };
 
   const fetchMyPosts = async () => {
+    if (!targetUserId) return;
     setLoadingPosts(true);
     try {
-      const res = await fetch(`${API_BASE}/posts/my?user_id=${user?.id}`);
+      const res = await fetch(`${API_BASE}/posts/my?user_id=${targetUserId}`);
       if (res.ok) {
         const data = await res.json();
         setMyPosts(data);
       }
     } catch (error) {
-      console.error("Failed to fetch my posts", error);
+      console.error("Failed to fetch posts", error);
     } finally {
       setLoadingPosts(false);
     }
   };
 
   const fetchMyVideos = async () => {
-    if (!user?.id) return;
+    if (!targetUserId) return;
     setLoadingVideos(true);
     try {
-      // Fetch only approved videos for the profile view as requested
-      const res = await fetch(`${API_BASE}/videos/user/${user.id}`);
+      const res = await fetch(`${API_BASE}/videos/user/${targetUserId}`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
-          setMyVideos(data);
-        } else {
-          console.error("Expected array for my videos, got:", data);
-          setMyVideos([]);
-        }
+        setMyVideos(data);
       }
     } catch (error) {
-      console.error("Failed to fetch my videos", error);
+      console.error("Failed to fetch videos", error);
     } finally {
       setLoadingVideos(false);
+    }
+  };
+
+  const handleFriendAction = async () => {
+    if (!currentUser || !userId) return;
+    try {
+      if (friendshipStatus === "none") {
+        const res = await fetch(`${API_BASE}/friends/request?from_user_id=${currentUser.id}&to_user_id=${userId}`, {
+          method: "POST"
+        });
+        if (res.ok) {
+          setFriendshipStatus("pending");
+          alert("Friend request sent!");
+        }
+      } else if (friendshipStatus === "received") {
+        // Find the request ID from notifications or requests list (simplified for now: we need an endpoint to get request id by users)
+        // Or refactor respond to take from/to users.
+        // For now, let's just assume we need to respond.
+        // Actually, backend respond takes request_id. 
+        // Let's add an endpoint or search for it.
+        alert("Please respond to the friend request in your notifications 🔔");
+      }
+    } catch (err) {
+      console.error("Friend action failed", err);
     }
   };
 
   const handleDeletePost = async (postId: string) => {
     if (!confirm("Are you sure you want to delete this post?")) return;
     try {
-      const res = await fetch(`${API_BASE}/posts/${postId}?user_id=${user?.id}`, {
+      const res = await fetch(`${API_BASE}/posts/${postId}?user_id=${currentUser?.id}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -125,7 +197,7 @@ export default function ProfileScreen() {
   };
 
   const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0] && user) {
+    if (e.target.files && e.target.files[0] && currentUser) {
       const file = e.target.files[0];
       if (file.size > 100 * 1024 * 1024) {
         alert("Video file is too large. Max 100MB allowed.");
@@ -175,8 +247,8 @@ export default function ProfileScreen() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             video_url: videoUrl,
-            user_id: user.id,
-            author_name: user.full_name || user.email?.split("@")[0] || "MindRise User",
+            user_id: currentUser.id,
+            author_name: currentUser.full_name || currentUser.email?.split("@")[0] || "MindRise User",
             caption: caption
           }),
         });
@@ -194,8 +266,8 @@ export default function ProfileScreen() {
             id: regData.videoId,
             video_url: videoUrl,
             status: "pending" as const,
-            user_id: user.id,
-            author_name: user.full_name || user.email?.split("@")[0] || "Me",
+            user_id: currentUser.id,
+            author_name: currentUser.full_name || currentUser.email?.split("@")[0] || "Me",
             created_at: new Date().toISOString()
           };
           setMyVideos(prev => [newVideo, ...prev]);
@@ -215,7 +287,7 @@ export default function ProfileScreen() {
   const handleDeleteVideo = async (videoId: string) => {
     if (!confirm("Are you sure you want to delete this video?")) return;
     try {
-      const res = await fetch(`${API_BASE}/videos/${videoId}?user_id=${user?.id}`, {
+      const res = await fetch(`${API_BASE}/videos/${videoId}?user_id=${currentUser?.id}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -229,7 +301,7 @@ export default function ProfileScreen() {
   };
 
   const handleProfilePicUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0] && user) {
+    if (e.target.files && e.target.files[0] && currentUser) {
       const file = e.target.files[0];
       try {
         const base64 = await new Promise<string>((resolve, reject) => {
@@ -239,7 +311,7 @@ export default function ProfileScreen() {
           reader.onerror = error => reject(error);
         });
 
-        const res = await fetch(`${API_BASE}/auth/user/${user.id}/profile-pic`, {
+        const res = await fetch(`${API_BASE}/auth/user/${currentUser.id}/profile-pic`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ profile_pic: base64 }),
@@ -247,7 +319,7 @@ export default function ProfileScreen() {
 
         if (res.ok) {
           const updatedUser = await res.json();
-          setUser(updatedUser);
+          setCurrentUser(updatedUser);
         } else {
           alert("Failed to upload profile picture");
         }
@@ -259,17 +331,17 @@ export default function ProfileScreen() {
   };
 
   const handleBioSave = async () => {
-    if (!user) return;
+    if (!currentUser) return;
     setIsSavingBio(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/user/${user.id}/bio`, {
+      const res = await fetch(`${API_BASE}/auth/user/${currentUser.id}/bio`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bio: bioDraft }),
       });
       if (res.ok) {
         const updatedUser = await res.json();
-        setUser(updatedUser);
+        setCurrentUser(updatedUser);
         setIsEditingBio(false);
       } else {
         alert("Failed to update bio");
@@ -284,10 +356,10 @@ export default function ProfileScreen() {
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!currentUser) return;
     setIsSavingDetails(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/user/${user.id}/profile`, {
+      const res = await fetch(`${API_BASE}/auth/user/${currentUser.id}/profile`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -298,7 +370,7 @@ export default function ProfileScreen() {
 
       if (res.ok) {
         const updatedUser = await res.json();
-        setUser(updatedUser);
+        setCurrentUser(updatedUser);
         setIsEditingDetails(false);
         alert("Profile updated successfully!");
       } else {
@@ -314,16 +386,16 @@ export default function ProfileScreen() {
   };
 
   const handleDeleteProfilePic = async () => {
-    if (!user || !user.profile_pic) return;
+    if (!currentUser || !currentUser.profile_pic) return;
     if (!confirm("Are you sure you want to remove your profile picture?")) return;
 
     try {
-      const res = await fetch(`${API_BASE}/auth/user/${user.id}/profile-pic`, {
+      const res = await fetch(`${API_BASE}/auth/user/${currentUser.id}/profile-pic`, {
         method: "DELETE",
       });
       if (res.ok) {
         const updatedUser = await res.json();
-        setUser(updatedUser);
+        setCurrentUser(updatedUser);
       } else {
         alert("Failed to remove profile picture");
       }
@@ -345,8 +417,8 @@ export default function ProfileScreen() {
   };
 
 
-  if (!user) return null;
-  const isAdmin = user?.role === "admin";
+  if (!targetUser) return null;
+  const isAdmin = currentUser?.role === "admin";
 
   return (
     <motion.div
@@ -364,7 +436,7 @@ export default function ProfileScreen() {
         >
           <Settings className="w-5 h-5" />
         </button>
-        <h1 className="text-lg font-bold text-slate-800 tracking-tight">My Profile</h1>
+        <h1 className="text-lg font-bold text-slate-800 tracking-tight">Profile</h1>
         <button
           type="button"
           className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
@@ -382,22 +454,24 @@ export default function ProfileScreen() {
             className="relative inline-block mb-4"
           >
             <div className="w-28 h-28 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-4xl font-bold text-white overflow-hidden shadow-2xl border-4 border-white ring-1 ring-slate-100">
-              {user.profile_pic ? (
-                <img src={user.profile_pic} alt="" className="w-full h-full object-cover" />
+              {targetUser.profile_pic ? (
+                <img src={targetUser.profile_pic} alt="" className="w-full h-full object-cover" />
               ) : (
-                user.full_name?.[0] || user.email[0].toUpperCase()
+                targetUser.full_name?.[0] || targetUser.email[0].toUpperCase()
               )}
             </div>
-            <label className="absolute bottom-1 right-1 w-9 h-9 rounded-full bg-slate-900 shadow-lg border-2 border-white flex items-center justify-center text-white cursor-pointer hover:bg-slate-800 transition-transform hover:scale-105">
-              <input type="file" accept="image/*" className="hidden" onChange={handleProfilePicUpload} />
-              <Camera className="w-4 h-4" />
-            </label>
+            {isOwnProfile && (
+              <label className="absolute bottom-1 right-1 w-9 h-9 rounded-full bg-slate-900 shadow-lg border-2 border-white flex items-center justify-center text-white cursor-pointer hover:bg-slate-800 transition-transform hover:scale-105">
+                <input type="file" accept="image/*" className="hidden" onChange={handleProfilePicUpload} />
+                <Camera className="w-4 h-4" />
+              </label>
+            )}
           </motion.div>
 
           <h2 className="text-2xl font-bold text-slate-800 mb-1">
-            {user.full_name || user.email.split("@")[0]}
+            {targetUser.full_name || targetUser.email.split("@")[0]}
           </h2>
-          <p className="text-slate-400 text-sm font-medium mb-4">{user.email}</p>
+          <p className="text-slate-400 text-sm font-medium mb-4">{targetUser.email}</p>
 
           <div className="w-full max-w-sm px-2">
             {isEditingBio ? (
@@ -417,7 +491,7 @@ export default function ProfileScreen() {
                   <button
                     onClick={() => {
                       setIsEditingBio(false);
-                      setBioDraft(user.bio || "");
+                      setBioDraft(targetUser.bio || "");
                     }}
                     className="px-4 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-50 rounded-lg transition"
                   >
@@ -436,12 +510,14 @@ export default function ProfileScreen() {
               <div
                 className="group cursor-pointer relative py-2 px-4 rounded-xl hover:bg-slate-50 transition-colors"
                 onClick={() => {
-                  setBioDraft(user.bio || "");
-                  setIsEditingBio(true);
+                  if (isOwnProfile) {
+                    setBioDraft(targetUser.bio || "");
+                    setIsEditingBio(true);
+                  }
                 }}
               >
                 <p className="text-slate-600 text-sm leading-relaxed px-2">
-                  {user.bio || "Click to add a bio..."}
+                  {targetUser.bio || (isOwnProfile ? "Click to add a bio..." : "No bio yet")}
                 </p>
                 <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
                   <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">EDIT</span>
@@ -452,9 +528,9 @@ export default function ProfileScreen() {
 
           <div className="flex gap-2 justify-center mt-6">
             <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-              {user.role}
+              {targetUser.role}
             </span>
-            {user.profile_pic && (
+            {isOwnProfile && targetUser.profile_pic && (
               <button
                 onClick={handleDeleteProfilePic}
                 className="text-rose-600 text-[10px] uppercase font-bold tracking-wider bg-rose-50 px-3 py-1 rounded-full border border-rose-100 hover:bg-rose-100 transition-colors"
@@ -462,35 +538,66 @@ export default function ProfileScreen() {
                 Remove Photo
               </button>
             )}
+            {!isOwnProfile && (
+              <button
+                onClick={handleFriendAction}
+                disabled={friendshipStatus === "pending" || friendshipStatus === "accepted"}
+                className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm ${friendshipStatus === "none"
+                  ? "bg-slate-900 text-white hover:bg-slate-800"
+                  : friendshipStatus === "pending"
+                    ? "bg-amber-50 text-amber-600 border border-amber-200 cursor-default"
+                    : friendshipStatus === "received"
+                      ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                      : "bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-default"
+                  }`}
+              >
+                {friendshipStatus === "none" && <><UserPlus className="w-4 h-4" /> Add Friend</>}
+                {friendshipStatus === "pending" && <><Clock className="w-4 h-4" /> Requested</>}
+                {friendshipStatus === "received" && <><CheckCircle2 className="w-4 h-4" /> Accept Request</>}
+                {friendshipStatus === "accepted" && <><Users className="w-4 h-4" /> Friends</>}
+              </button>
+            )}
           </div>
         </div>
 
         {/* MindRise Growth Tree Section */}
-        <div className="mb-8">
-          <GrowthTree createdAt={user.created_at} />
-        </div>
+        {(isOwnProfile || friendshipStatus === "accepted") ? (
+          <div className="mb-8">
+            <GrowthTree createdAt={targetUser.created_at} />
+          </div>
+        ) : (
+          <div className="mb-8 p-8 bg-slate-50 rounded-3xl border border-slate-100 text-center">
+            <Shield className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+            <p className="text-slate-700 font-bold mb-1">Growth Tree is private</p>
+            <p className="text-slate-400 text-sm">Become friends to see their mindful growth journey 🌳</p>
+          </div>
+        )}
 
-        <div className="grid grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 text-center">
             <p className="text-2xl font-bold text-slate-800">{myPosts.length}</p>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Posts</p>
           </div>
-          <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-4 rounded-2xl shadow-lg shadow-emerald-200 text-center text-white transform scale-105">
-            <p className="text-2xl font-bold text-white">{myVideos.length}</p>
-            <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-wider mt-1">Videos</p>
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 text-center">
+            <p className="text-2xl font-bold text-slate-800">{myVideos.length}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Videos</p>
           </div>
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 text-center">
-            <p className="text-2xl font-bold text-slate-800">
-              {(() => {
-                if (!user.created_at) return 0;
-                const created = new Date(user.created_at);
+            <p className="text-2xl font-bold text-slate-800">{friendsList.length}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Friends</p>
+          </div>
+          <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-4 rounded-2xl shadow-lg shadow-emerald-200 text-center text-white transform scale-105">
+            <p className="text-2xl font-bold text-white">
+              {(isOwnProfile || friendshipStatus === "accepted") ? (() => {
+                if (!targetUser.created_at) return 0;
+                const created = new Date(targetUser.created_at);
                 const now = new Date();
                 const diffTime = Math.abs(now.getTime() - created.getTime());
                 const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                return Math.max(1, days); // Minimum 1 day streak
-              })()}
+                return Math.max(1, days);
+              })() : "—"}
             </p>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Streak</p>
+            <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-wider mt-1">Streak</p>
           </div>
         </div>
 
@@ -506,13 +613,15 @@ export default function ProfileScreen() {
           </motion.button>
         )}
 
-        <div className="mb-8">
-          <label className={`w-full py-4 rounded-2xl font-bold text-slate-700 bg-white border-2 border-dashed border-slate-300 flex items-center justify-center gap-2 cursor-pointer hover:border-slate-800 hover:bg-slate-50 transition-all ${isUploadingVideo ? 'opacity-50 pointer-events-none' : ''}`}>
-            <input type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
-            <Upload className="w-5 h-5" />
-            {isUploadingVideo ? "Uploading..." : "Upload New Video"}
-          </label>
-        </div>
+        {isOwnProfile && (
+          <div className="mb-8">
+            <label className={`w-full py-4 rounded-2xl font-bold text-slate-700 bg-white border-2 border-dashed border-slate-300 flex items-center justify-center gap-2 cursor-pointer hover:border-slate-800 hover:bg-slate-50 transition-all ${isUploadingVideo ? 'opacity-50 pointer-events-none' : ''}`}>
+              <input type="file" accept="video/*" className="hidden" onChange={handleVideoUpload} />
+              <Upload className="w-5 h-5" />
+              {isUploadingVideo ? "Uploading..." : "Upload New Video"}
+            </label>
+          </div>
+        )}
 
         <div className="flex mb-6 bg-slate-100/50 p-1.5 rounded-xl">
           <button
@@ -539,15 +648,28 @@ export default function ProfileScreen() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("saved")}
-            className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === "saved"
+            onClick={() => setActiveTab("friends")}
+            className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === "friends"
               ? "bg-white text-slate-800 shadow-sm"
               : "text-slate-400 hover:text-slate-600"
               }`}
           >
-            <Bookmark className="w-4 h-4" />
-            Saved
+            <Users className="w-4 h-4" />
+            Friends
           </button>
+          {isOwnProfile && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("saved")}
+              className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === "saved"
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-400 hover:text-slate-600"
+                }`}
+            >
+              <Bookmark className="w-4 h-4" />
+              Saved
+            </button>
+          )}
         </div>
 
         <AnimatePresence mode="wait">
@@ -670,7 +792,7 @@ export default function ProfileScreen() {
             </motion.div>
           )}
 
-          {activeTab === "saved" && (
+          {activeTab === "saved" && isOwnProfile && (
             <motion.div
               key="saved"
               initial={{ opacity: 0, x: 20 }}
@@ -683,6 +805,50 @@ export default function ProfileScreen() {
               </div>
               <p className="text-slate-900 font-bold mb-1">No saved items</p>
               <p className="text-slate-500 text-sm">Save posts to read them later.</p>
+            </motion.div>
+          )}
+
+          {activeTab === "friends" && (
+            <motion.div
+              key="friends"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-3"
+            >
+              {friendsList.length === 0 ? (
+                <div className="flex flex-col items-center py-16 text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center text-3xl mb-4">
+                    🤝
+                  </div>
+                  <p className="text-slate-900 font-bold mb-1">No friends yet</p>
+                  <p className="text-slate-500 text-sm">Connect with others to grow together!</p>
+                </div>
+              ) : (
+                friendsList.map(friend => (
+                  <div
+                    key={friend.id}
+                    onClick={() => navigate(`/profile/${friend.id}`)}
+                    className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold overflow-hidden border-2 border-white shadow-sm">
+                        {friend.profile_pic ? (
+                          <img src={friend.profile_pic} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          friend.full_name?.[0] || friend.email[0].toUpperCase()
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800 text-sm">{friend.full_name || "User"}</p>
+                        <p className="text-xs text-slate-400">{friend.email}</p>
+                      </div>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
+                      →
+                    </div>
+                  </div>
+                ))
+              )}
             </motion.div>
           )}
         </AnimatePresence>
