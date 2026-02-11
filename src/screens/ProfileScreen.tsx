@@ -5,14 +5,7 @@ import { LogOut, Settings, Shield, Trash2, MoreVertical, Grid, Bookmark, Camera,
 import { Post, Video } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
 import VideoPlayer from "../components/VideoPlayer";
-
-const getApiBase = () => {
-  const base = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000" : "/api");
-  if (base.startsWith("http")) return base;
-  return window.location.origin + (base.startsWith("/") ? "" : "/") + base;
-};
-
-const API_BASE = getApiBase();
+import { API_BASE } from "../config";
 
 export default function ProfileScreen() {
   const navigate = useNavigate();

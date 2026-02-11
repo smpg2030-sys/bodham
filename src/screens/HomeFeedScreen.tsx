@@ -5,16 +5,9 @@ import { useAuth } from "../context/AuthContext";
 import { Post, Video } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
 import VideoPlayer from "../components/VideoPlayer";
+import { API_BASE } from "../config";
 
 const TABS = ["All Posts", "Videos", "Daily Quotes", "Gratitude"] as const;
-
-const getApiBase = () => {
-  const base = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000" : "/api");
-  if (base.startsWith("http")) return base;
-  return window.location.origin + (base.startsWith("/") ? "" : "/") + base;
-};
-
-const API_BASE = getApiBase();
 
 export default function HomeFeedScreen() {
   const navigate = useNavigate();
@@ -68,7 +61,7 @@ export default function HomeFeedScreen() {
   const fetchFriendRequests = async () => {
     if (!user) return;
     try {
-      const res = await fetch(`${API_BASE}/friends/requests?user_id=${user.id}`);
+      const res = await fetch(`${API_BASE} /friends/requests ? user_id = ${user.id} `);
       if (res.ok) {
         const data = await res.json();
         setFriendRequests(data);
@@ -95,7 +88,7 @@ export default function HomeFeedScreen() {
       }
       setSearchingUsers(true);
       try {
-        const res = await fetch(`${API_BASE}/friends/search?query=${searchQuery}&current_user_id=${user?.id}`);
+        const res = await fetch(`${API_BASE} /friends/search ? query = ${searchQuery}& current_user_id=${user?.id} `);
         if (res.ok) {
           const data = await res.json();
           setSearchResults(data);
@@ -114,7 +107,7 @@ export default function HomeFeedScreen() {
   const handleAddFriend = async (toUserId: string) => {
     if (!user) return;
     try {
-      const res = await fetch(`${API_BASE}/friends/request?from_user_id=${user.id}&to_user_id=${toUserId}`, {
+      const res = await fetch(`${API_BASE} /friends/request ? from_user_id = ${user.id}& to_user_id=${toUserId} `, {
         method: "POST"
       });
       if (res.ok) {
@@ -127,13 +120,13 @@ export default function HomeFeedScreen() {
 
   const handleRespondRequest = async (requestId: string, action: "accept" | "decline") => {
     try {
-      const res = await fetch(`${API_BASE}/friends/respond?request_id=${requestId}&action=${action}`, {
+      const res = await fetch(`${API_BASE} /friends/respond ? request_id = ${requestId}& action=${action} `, {
         method: "POST"
       });
       if (res.ok) {
         fetchFriendRequests();
         fetchData(); // Refresh feed if accepted
-        alert(`Request ${action}ed!`);
+        alert(`Request ${action} ed!`);
       }
     } catch (err) {
       alert("Failed to respond to request.");
@@ -173,7 +166,7 @@ export default function HomeFeedScreen() {
         author_name: user.full_name || user.email || ""
       }).toString();
 
-      const response = await fetch(`${API_BASE}/posts/?${queryParams}`, {
+      const response = await fetch(`${API_BASE} /posts/ ? ${queryParams} `, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -193,7 +186,7 @@ export default function HomeFeedScreen() {
       }
     } catch (error: any) {
       console.error("Error creating post", error);
-      alert(`Error submitting post. ${error.name}: ${error.message}\nAPI_BASE: ${API_BASE}`);
+      alert(`Error submitting post.${error.name}: ${error.message} \nAPI_BASE: ${API_BASE} `);
     } finally {
       setIsUploading(false);
     }
@@ -219,7 +212,7 @@ export default function HomeFeedScreen() {
             </div>
           </div>
           <h1 className="text-lg font-bold text-slate-800 tracking-tight truncate max-w-[200px]">
-            {activeTab === "Videos" ? "Mind Reels" : `Welcome, ${user?.full_name || user?.email?.split("@")[0] || "Friend"}`}
+            {activeTab === "Videos" ? "Mind Reels" : `Welcome, ${user?.full_name || user?.email?.split("@")[0] || "Friend"} `}
           </h1>
         </div>
         <div className="flex items-center gap-3">
@@ -260,10 +253,10 @@ export default function HomeFeedScreen() {
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`px-5 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-300 shadow-sm ${activeTab === tab
-                ? "bg-slate-800 text-white shadow-slate-200 scale-105"
-                : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300"
-                }`}
+              className={`px - 5 py - 2.5 rounded - full text - sm font - semibold whitespace - nowrap transition - all duration - 300 shadow - sm ${activeTab === tab
+                  ? "bg-slate-800 text-white shadow-slate-200 scale-105"
+                  : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300"
+                } `}
             >
               {tab}
             </button>
@@ -327,7 +320,7 @@ export default function HomeFeedScreen() {
                   <h3 className="px-4 pb-3 font-bold text-slate-800">{video.title}</h3>
                   <div className="aspect-[9/16] max-h-[600px] w-full bg-black">
                     <VideoPlayer
-                      src={video.video_url.startsWith("/static") ? `${API_BASE}${video.video_url}` : video.video_url}
+                      src={video.video_url.startsWith("/static") ? `${API_BASE}${video.video_url} ` : video.video_url}
                       className="h-full"
                     />
                   </div>
@@ -376,7 +369,7 @@ export default function HomeFeedScreen() {
                 {post.image_url && (
                   <div className="mt-4 rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 relative group-hover:shadow-md transition-shadow">
                     <img
-                      src={post.image_url.startsWith("/static") ? `${API_BASE}${post.image_url}` : post.image_url}
+                      src={post.image_url.startsWith("/static") ? `${API_BASE}${post.image_url} ` : post.image_url}
                       alt="Post content"
                       className="w-full h-auto max-h-[400px] object-contain"
                     />
