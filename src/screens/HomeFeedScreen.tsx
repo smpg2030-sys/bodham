@@ -50,16 +50,38 @@ export default function HomeFeedScreen() {
     try {
       if (activeTab === "Videos") {
         const res = await fetch(`${API_BASE}/videos/`);
-        const data = await res.json();
-        setVideos(data);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setVideos(data);
+          } else {
+            console.error("Expected array for videos, got:", data);
+            setVideos([]);
+          }
+        } else {
+          console.error("Failed to fetch videos, status:", res.status);
+          setVideos([]);
+        }
       } else {
         const url = user ? `${API_BASE}/posts/?user_id=${user.id}` : `${API_BASE}/posts/`;
         const res = await fetch(url);
-        const data = await res.json();
-        setPosts(data);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setPosts(data);
+          } else {
+            console.error("Expected array for posts, got:", data);
+            setPosts([]);
+          }
+        } else {
+          console.error("Failed to fetch posts, status:", res.status);
+          setPosts([]);
+        }
       }
     } catch (error) {
       console.error("Error fetching feed:", error);
+      setVideos([]);
+      setPosts([]);
     } finally {
       setLoading(false);
     }
@@ -329,7 +351,7 @@ export default function HomeFeedScreen() {
 
                   <div className="aspect-[9/16] max-h-[600px] w-full bg-black shadow-inner">
                     <VideoPlayer
-                      src={video.video_url.startsWith("/static") ? `${API_BASE}${video.video_url}` : video.video_url}
+                      src={video.video_url?.startsWith("/static") ? `${API_BASE}${video.video_url}` : (video.video_url || "")}
                       className="h-full"
                     />
                   </div>
