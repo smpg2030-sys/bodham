@@ -41,10 +41,13 @@ export default function ExploreScreen() {
   const [hasEbookAccess, setHasEbookAccess] = useState(false);
   const [communityStories, setCommunityStories] = useState<CommunityStory[]>([]);
 
+  const [error, setError] = useState<string | null>(null);
+
   React.useEffect(() => {
-    fetch(`${API_BASE}/community-stories`)
+    setError(null);
+    fetch(`${API_BASE}/community-stories/`)
       .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch");
+        if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
         return res.json();
       })
       .then((data) => {
@@ -56,6 +59,7 @@ export default function ExploreScreen() {
       })
       .catch((err) => {
         console.error("Failed to fetch stories:", err);
+        setError(err.message);
         setCommunityStories([]);
       });
   }, []);
@@ -173,7 +177,7 @@ export default function ExploreScreen() {
               {communityStories.length === 0 && (
                 <div className="text-center py-10 text-slate-400">
                   <div className="text-4xl mb-2">📭</div>
-                  <p className="text-sm">More stories coming soon!</p>
+                  <p className="text-sm">{error ? `Error: ${error}` : "More stories coming soon!"}</p>
                 </div>
               )}
               <div className="h-4" /> {/* Bottom padding for better scroll feel */}

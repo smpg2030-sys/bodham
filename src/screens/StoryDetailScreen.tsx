@@ -21,6 +21,7 @@ export default function StoryDetailScreen() {
     useEffect(() => {
         const fetchStory = async () => {
             try {
+                // Ensure no double slash if storyId is empty (though it shouldn't be)
                 const response = await fetch(`${API_BASE}/community-stories/${storyId}`);
                 if (!response.ok) {
                     throw new Error("Failed to fetch story");
