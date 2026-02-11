@@ -15,6 +15,7 @@ import AdminPanelScreen from "./screens/AdminPanelScreen";
 import ArticleDetailScreen from "./screens/ArticleDetailScreen";
 import CommunityStoriesPreviewScreen from "./screens/CommunityStoriesPreviewScreen";
 import StoryDetailScreen from "./screens/StoryDetailScreen";
+import JournalScreen from "./screens/JournalScreen";
 import { AnimatePresence } from "framer-motion";
 import { useLocation } from "react-router-dom";
 
@@ -77,6 +78,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <TherapistSupportScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/journal"
+          element={
+            <ProtectedRoute>
+              <JournalScreen />
             </ProtectedRoute>
           }
         />

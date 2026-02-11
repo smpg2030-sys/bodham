@@ -78,6 +78,7 @@ export default function ExploreScreen() {
               onClick={() => {
                 if (cat.title === "E-Books") setShowEbooks(true);
                 if (cat.title === "Community") navigate("/community-stories");
+                if (cat.title === "Journaling") navigate("/journal");
               }}
               className={`${cat.bg} rounded-xl p-6 text-left transition hover:opacity-90`}
             >

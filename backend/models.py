@@ -114,3 +114,18 @@ class CommunityStory(BaseModel):
     author: str | None = None
     created_at: str
 
+
+class JournalEntryCreate(BaseModel):
+    title: str | None = None
+    content: str
+    date: str | None = None  # ISO format
+
+
+class JournalEntryResponse(BaseModel):
+    id: str
+    user_id: str
+    title: str | None = None
+    content: str
+    date: str
+    created_at: str
+

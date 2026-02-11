@@ -9,6 +9,7 @@ from routes.friends import router as friends_router
 from routes.videos import router as videos_router
 from routes.stories import router as stories_router
 from routes.upload import router as upload_router
+from routes.journals import router as journals_router
 
 app = FastAPI(title="MindRise API", version="1.0.0")
 
@@ -74,6 +75,7 @@ app.include_router(upload_router, prefix=prefix)
 app.include_router(friends_router, prefix=prefix)
 app.include_router(videos_router, prefix=prefix)
 app.include_router(stories_router, prefix=prefix + "/community-stories")
+app.include_router(journals_router, prefix=prefix)
 
 
 @app.get(prefix + "/health")

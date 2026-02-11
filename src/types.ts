@@ -66,3 +66,12 @@ export interface CommunityStory {
     author?: string;
     created_at: string;
 }
+
+export interface JournalEntry {
+    id: string;
+    user_id: string;
+    title?: string;
+    content: string;
+    date: string;
+    created_at: string;
+}
