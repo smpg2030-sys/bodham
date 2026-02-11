@@ -94,3 +94,21 @@ class NewsArticle(BaseModel):
     image_url: str | None = None
     author: str
     published_at: str
+
+
+class CommunityStoryCreate(BaseModel):
+    title: str
+    description: str
+    content: str
+    image_url: str | None = None
+    author: str | None = None
+
+
+class CommunityStory(BaseModel):
+    id: str
+    title: str
+    description: str
+    content: str
+    image_url: str | None = None
+    author: str | None = None
+    created_at: str
