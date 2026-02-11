@@ -3,29 +3,31 @@ from pydantic import BaseModel, EmailStr
 
 
 class UserRegister(BaseModel):
-    email: EmailStr
+    email: EmailStr | None = None
+    mobile: str | None = None
     password: str
     full_name: str | None = None
 
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: str # Can be email or mobile
     password: str
 
 
 class PasswordResetRequest(BaseModel):
-    email: EmailStr
+    email: str # Can be email or mobile
 
 
 class PasswordResetConfirm(BaseModel):
-    email: EmailStr
+    email: str # Can be email or mobile
     otp: str
     new_password: str
 
 
 class UserResponse(BaseModel):
     id: str
-    email: str
+    email: str | None = None
+    mobile: str | None = None
     role: str = "user"
     full_name: str | None = None
     is_verified: bool = False

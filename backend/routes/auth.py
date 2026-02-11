@@ -40,25 +40,33 @@ def generate_otp() -> str:
 
 @router.post("/register")
 async def register(data: UserRegister, background_tasks: BackgroundTasks):
-    print(f"Registration request for: {data.email}")
+    print(f"Registration request for: {data.email or data.mobile}")
     db = get_db()
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established. Please check your configuration.")
     
+    if not data.email and not data.mobile:
+        raise HTTPException(status_code=400, detail="Either email or mobile is required")
+
     users = db.users
-    existing_user = users.find_one({"email": data.email})
+    existing_user = None
+    if data.email:
+        existing_user = users.find_one({"email": data.email})
+    elif data.mobile:
+        existing_user = users.find_one({"mobile": data.mobile})
     
     if existing_user:
         if existing_user.get("is_verified"):
-            raise HTTPException(status_code=400, detail="Email already registered")
+            raise HTTPException(status_code=400, detail="Account already registered")
         else:
-            # Resend OTP logic could go here, for now just update password/name and resend
+            # Resend OTP logic could go here
             pass
 
     otp = generate_otp()
     
     doc = {
         "email": data.email,
+        "mobile": data.mobile,
         "password_hash": hash_password(data.password),
         "full_name": data.full_name or "",
         "role": "user",
@@ -68,23 +76,28 @@ async def register(data: UserRegister, background_tasks: BackgroundTasks):
     
     # Update if exists (unverified), else insert
     if existing_user:
-        users.update_one({"email": data.email}, {"$set": doc})
+        if data.email:
+            users.update_one({"email": data.email}, {"$set": doc})
+        else:
+            users.update_one({"mobile": data.mobile}, {"$set": doc})
     else:
         users.insert_one(doc)
 
-    # Send OTP Email
-    message = MessageSchema(
-        subject="MindRise Verification OTP",
-        recipients=[data.email],
-        body=f"Your verification code is: {otp}",
-        subtype=MessageType.html
-    )
-
-    fm = FastMail(conf)
-    # Using background task to not block response
-    background_tasks.add_task(fm.send_message, message)
-
-    return {"message": "OTP sent to email. Please verify."}
+    # Send OTP
+    if data.email:
+        message = MessageSchema(
+            subject="MindRise Verification OTP",
+            recipients=[data.email],
+            body=f"Your verification code is: {otp}",
+            subtype=MessageType.html
+        )
+        fm = FastMail(conf)
+        background_tasks.add_task(fm.send_message, message)
+        return {"message": "OTP sent to email. Please verify."}
+    else:
+        # Mock SMS
+        print(f"------------ SMS OTP for {data.mobile}: {otp} ------------")
+        return {"message": "OTP sent to mobile. Please verify."}
 
 @router.post("/verify-otp", response_model=UserResponse)
 def verify_otp(data: OTPVerify):
@@ -93,6 +106,11 @@ def verify_otp(data: OTPVerify):
          raise HTTPException(status_code=503, detail="Database not available")
     
     user = db.users.find_one({"email": data.email})
+    
+    # If not found by email, try finding by mobile (data.email might be holding the mobile number string)
+    if not user:
+        user = db.users.find_one({"mobile": data.email})
+
     if not user:
         raise HTTPException(status_code=400, detail="User not found")
     
@@ -100,11 +118,12 @@ def verify_otp(data: OTPVerify):
         raise HTTPException(status_code=400, detail="Invalid OTP")
     
     # Mark verified and clear OTP
-    db.users.update_one({"email": data.email}, {"$set": {"is_verified": True, "otp": None}})
+    db.users.update_one({"_id": user["_id"]}, {"$set": {"is_verified": True, "otp": None}})
     
     return UserResponse(
         id=str(user["_id"]),
-        email=user["email"],
+        email=user.get("email"),
+        mobile=user.get("mobile"),
         full_name=user.get("full_name"),
         role=user.get("role", "user"),
         is_verified=True,
@@ -118,16 +137,22 @@ def login(data: UserLogin):
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established. Please check your configuration.")
     
+    # Try finding by email
     user = db.users.find_one({"email": data.email})
+    # If not found, try finding by mobile
+    if not user:
+        user = db.users.find_one({"mobile": data.email})
+
     if not user or not verify_password(data.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     
     if not user.get("is_verified", False):
-        raise HTTPException(status_code=403, detail="Email not verified. Please verify your account.")
+        raise HTTPException(status_code=403, detail="Account not verified.")
 
     return UserResponse(
         id=str(user["_id"]),
-        email=user["email"],
+        email=user.get("email"),
+        mobile=user.get("mobile"),
         full_name=user.get("full_name") or None,
         role=user.get("role", "user"),
         is_verified=True,

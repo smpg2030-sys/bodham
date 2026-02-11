@@ -18,7 +18,7 @@ export default function LoginScreen() {
   const { setUser } = useAuth();
 
   const [mode, setMode] = useState<"login" | "register" | "forgot-request" | "forgot-reset">("login");
-  const [email, setEmail] = useState("");
+  const [emailOrMobile, setEmailOrMobile] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [otp, setOtp] = useState("");
@@ -36,22 +36,38 @@ export default function LoginScreen() {
     setMessage(null);
     setLoading(true);
 
+    // Determine if input is email or mobile
+    const isMobile = /^\d{10}$/.test(emailOrMobile.trim());
+    const isEmail = emailOrMobile.includes("@");
+
+    if (!isMobile && !isEmail) {
+      setMessage({ type: "error", text: "Please enter a valid Email or 10-digit Mobile Number." });
+      setLoading(false);
+      return;
+    }
+
     try {
       let endpoint = "";
-      let body = {};
+      let body: any = {};
 
       if (mode === "login") {
         endpoint = "/auth/login";
-        body = { email, password };
+        body = { email: emailOrMobile, password }; // Backend handles email field as identifier
       } else if (mode === "register") {
         endpoint = "/auth/register";
-        body = { email, password, full_name: fullName || undefined };
+        body = {
+          password,
+          full_name: fullName || undefined
+        };
+        if (isMobile) body.mobile = emailOrMobile;
+        else body.email = emailOrMobile;
+
       } else if (mode === "forgot-request") {
         endpoint = "/auth/forgot-password";
-        body = { email };
+        body = { email: emailOrMobile }; // Backend handles it
       } else if (mode === "forgot-reset") {
         endpoint = "/auth/reset-password";
-        body = { email, otp, new_password: newPassword };
+        body = { email: emailOrMobile, otp, new_password: newPassword };
       }
 
       const res = await fetch(`${API_BASE}${endpoint}`, {
@@ -77,6 +93,7 @@ export default function LoginScreen() {
         setUser({
           id: data.id,
           email: data.email,
+          mobile: data.mobile,
           full_name: data.full_name ?? null,
         });
         navigate("/", { replace: true });
@@ -86,11 +103,11 @@ export default function LoginScreen() {
       if (mode === "register") {
         setMessage({
           type: "success",
-          text: "Code sent! Redirecting to verify...",
+          text: isMobile ? "OTP sent to Mobile! Check console (Simulator)." : "Code sent! Redirecting to verify...",
         });
-        setTimeout(() => navigate("/verify", { state: { email } }), 1000);
+        setTimeout(() => navigate("/verify", { state: { email: emailOrMobile } }), 1500);
       } else if (mode === "forgot-request") {
-        setMessage({ type: "success", text: "OTP sent to your email." });
+        setMessage({ type: "success", text: "OTP sent." });
         setMode("forgot-reset");
       } else if (mode === "forgot-reset") {
         setMessage({ type: "success", text: "Password updated! please login." });
@@ -98,12 +115,13 @@ export default function LoginScreen() {
       }
 
     } catch (err: any) {
-      if (err.message.includes("Email not verified") && mode === "login") {
+      if ((err.message.includes("Email not verified") || err.message.includes("Account not verified")) && mode === "login") {
+        // Allow redirect to verify
         setMessage({
           type: "error",
           text: "Account not verified. Redirecting...",
         });
-        setTimeout(() => navigate("/verify", { state: { email } }), 1500);
+        setTimeout(() => navigate("/verify", { state: { email: emailOrMobile } }), 1500);
       } else {
         setMessage({
           type: "error",
@@ -144,15 +162,15 @@ export default function LoginScreen() {
 
           {(mode === "login" || mode === "register" || mode === "forgot-request" || mode === "forgot-reset") && (
             <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
+              <label className="block text-sm font-medium mb-1">Email or Mobile</label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                value={emailOrMobile}
+                onChange={(e) => setEmailOrMobile(e.target.value)}
                 required
                 disabled={mode === "forgot-reset"}
                 className="input-field disabled:opacity-70"
-                placeholder="you@example.com"
+                placeholder="you@example.com or 9876543210"
               />
             </div>
           )}
@@ -272,4 +290,3 @@ export default function LoginScreen() {
     </div>
   );
 }
-
