@@ -46,7 +46,7 @@ def get_feed(user_id: str | None = None):
             
         posts_cursor = db.posts.find({"user_id": {"$in": friend_ids}}).sort("created_at", -1)
     else:
-        # Fallback to all approved posts if no user_id (e.g. initial load before auth context is ready)
+        # Fallback to all approved posts if no user_id
         posts_cursor = db.posts.find().sort("created_at", -1)
         
     results = []

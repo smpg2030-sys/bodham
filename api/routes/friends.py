@@ -7,6 +7,10 @@ from datetime import datetime
 
 router = APIRouter(prefix="/friends", tags=["friends"])
 
+@router.get("/test")
+def test_friends():
+    return {"message": "friends route ok"}
+
 @router.get("/search", response_model=List[UserResponse])
 def search_users(query: str, current_user_id: str):
     db = get_db()

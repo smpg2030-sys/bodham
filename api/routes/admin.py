@@ -24,18 +24,17 @@ def get_all_users(role: str | None = None):
         all_users.append(UserResponse(
             id=str(user["_id"]),
             email=user["email"],
+            full_name=user.get("full_name") or None,
             role=user.get("role", "user"),
             is_verified=user.get("is_verified", False),
-            profile_pic=user.get("profile_pic"),
-            full_name=user.get("full_name") or None
+            profile_pic=user.get("profile_pic")
         ))
     return all_users
 
 @router.get("/stats")
-def get_stats(role: str | None = None):
+def get_stats(role: str):
     if role != "admin":
-         raise HTTPException(status_code=403, detail="Forbidden: Admin access required")
-
+         raise HTTPException(status_code=403, detail="Admin access required")
     db = get_db()
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established.")
@@ -50,10 +49,9 @@ def get_stats(role: str | None = None):
     }
 
 @router.get("/posts", response_model=List[PostResponse])
-def get_posts(status: str = "pending", role: str | None = None):
+def get_posts(role: str, status: str = "all"):
     if role != "admin":
-         raise HTTPException(status_code=403, detail="Forbidden: Admin access required")
-    
+        raise HTTPException(status_code=403, detail="Admin access required")
     db = get_db()
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established")
@@ -69,37 +67,17 @@ def get_posts(status: str = "pending", role: str | None = None):
         combined = approved + pending_rejected
         combined.sort(key=lambda x: x.get("created_at", ""), reverse=True)
         posts_cursor = combined
+        
     results = []
-    
-    # Collect user IDs to batch fetch emails
-    user_ids = set()
-    posts = []
+    # Collect user IDs for batch lookup if needed
     for doc in posts_cursor:
         doc["id"] = str(doc["_id"])
-        posts.append(doc)
-        if "user_id" in doc:
-            try:
-                user_ids.add(ObjectId(doc["user_id"]))
-            except:
-                pass
-                
-    # Fetch users
-    users_map = {}
-    if user_ids:
-        users = db.users.find({"_id": {"$in": list(user_ids)}})
-        for u in users:
-            users_map[str(u["_id"])] = {
-                "email": u["email"],
-                "profile_pic": u.get("profile_pic")
-            }
-            
-    # Attach emails and profile pics
-    for post in posts:
-        user_info = users_map.get(post["user_id"], {})
-        post["author_email"] = user_info.get("email")
-        post["author_profile_pic"] = user_info.get("profile_pic")
-        results.append(post)
-        
+        # Fetch author email for admin visibility
+        user = db.users.find_one({"_id": ObjectId(doc["user_id"])})
+        if user:
+            doc["author_email"] = user.get("email")
+            doc["author_profile_pic"] = user.get("profile_pic")
+        results.append(doc)
     return results
 
 class PostStatusUpdate(BaseModel):
@@ -107,13 +85,9 @@ class PostStatusUpdate(BaseModel):
     rejection_reason: str | None = None
 
 @router.put("/posts/{post_id}/status")
-def update_post_status(post_id: str, update: PostStatusUpdate, role: str | None = None):
+def update_post_status(post_id: str, update: PostStatusUpdate, role: str):
     if role != "admin":
-         raise HTTPException(status_code=403, detail="Forbidden: Admin access required")
-    
-    if update.status not in ["approved", "rejected"]:
-        raise HTTPException(status_code=400, detail="Invalid status")
-    
+        raise HTTPException(status_code=403, detail="Admin access required")
     db = get_db()
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established")
@@ -134,14 +108,23 @@ def update_post_status(post_id: str, update: PostStatusUpdate, role: str | None 
         return {"message": "Post approved and moved to live feed"}
     
     else:  # rejected
+        # First try to update in pending_posts (for pending or already rejected posts)
         result = db.pending_posts.update_one(
             {"_id": ObjectId(post_id)},
             {"$set": {"status": "rejected", "rejection_reason": update.rejection_reason}}
         )
         
         if result.matched_count == 0:
-            # If not in pending, maybe it was approved and we are trying to reject it?
-            # For now, let's just handle the transition from pending/rejected
-            raise HTTPException(status_code=404, detail="Post not found in pending moderation")
+            # Not found in pending_posts, check if it's in posts (already approved)
+            post = db.posts.find_one({"_id": ObjectId(post_id)})
+            if post:
+                # Move back to pending_posts with rejected status
+                post["status"] = "rejected"
+                post["rejection_reason"] = update.rejection_reason
+                db.pending_posts.insert_one(post)
+                db.posts.delete_one({"_id": ObjectId(post_id)})
+                return {"message": "Post approval revoked and rejected"}
+            else:
+                raise HTTPException(status_code=404, detail="Post not found in pending or approved posts")
             
         return {"message": "Post rejected"}

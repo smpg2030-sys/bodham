@@ -5,12 +5,7 @@ import uuid
 
 router = APIRouter(prefix="/upload", tags=["upload"])
 
-# Use /tmp on Vercel because root is read-only
-if os.getenv("VERCEL"):
-    UPLOAD_DIR = "/tmp/uploads"
-else:
-    UPLOAD_DIR = "uploads"
-
+UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/")
