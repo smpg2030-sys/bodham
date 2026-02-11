@@ -13,6 +13,7 @@ import MindRoomsScreen from "./screens/MindRoomsScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import TherapistSupportScreen from "./screens/TherapistSupportScreen";
 import AdminPanelScreen from "./screens/AdminPanelScreen";
+import ArticleDetailScreen from "./screens/ArticleDetailScreen";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -52,6 +53,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <AdminPanelScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/article/:articleId"
+          element={
+            <ProtectedRoute>
+              <ArticleDetailScreen />
             </ProtectedRoute>
           }
         />

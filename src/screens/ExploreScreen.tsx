@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell } from "lucide-react";
 
+
+// Category icons and labels
 const CATEGORIES = [
   { icon: "☀️", title: "Meditation", subtitle: "120+ Sessions", bg: "bg-emerald-100" },
   { icon: "🖼️", title: "Journaling", subtitle: "Daily Prompts", bg: "bg-sky-100" },
@@ -17,22 +19,20 @@ const EBOOKS = [
   { title: "Calm Mind Journey", author: "Sarah Miller", cover: "📔", price: "Premium" },
 ];
 
-const COMMUNITY_STORIES = [
-  {
-    title: "Indian AI Reading Document",
-    source: "The Better India",
-    link: "https://thebetterindia.com/innovation/indian-ai-document-reading-sarvam-gemini-openai-language-tests-11092770",
-    cover: "/images/sarvam-ai.png",
-    description: "How Sarvam AI is breaking language barriers in document reading."
-  }
-];
-
 export default function ExploreScreen() {
   const navigate = useNavigate();
   const [showEbooks, setShowEbooks] = useState(false);
   const [showCommunity, setShowCommunity] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [hasEbookAccess, setHasEbookAccess] = useState(false);
+  const [communityStories, setCommunityStories] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    fetch("http://localhost:8000/api/news")
+      .then((res) => res.json())
+      .then((data) => setCommunityStories(data))
+      .catch((err) => console.error("Failed to fetch stories:", err));
+  }, []);
 
   const handleSubscribe = () => {
     setShowPayment(true);
@@ -105,7 +105,7 @@ export default function ExploreScreen() {
           onClick={() => setShowCommunity(false)}
         >
           <div
-            className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto"
+            className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-4 border-b">
@@ -114,36 +114,43 @@ export default function ExploreScreen() {
                 ×
               </button>
             </div>
-            <div className="p-4 space-y-4">
-              {COMMUNITY_STORIES.map((story, i) => (
-                <div key={i} className="bg-slate-50 rounded-2xl p-4 flex flex-col gap-3">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {communityStories.map((story, i) => (
+                <div key={i} className="bg-slate-50 rounded-2xl p-4 flex flex-col gap-3 border border-slate-100 shadow-sm">
                   <div className="flex gap-4">
-                    <div className="w-16 h-16 bg-white rounded-xl shadow-sm overflow-hidden flex items-center justify-center">
-                      {story.cover.startsWith("/") ? (
-                        <img src={story.cover} alt="" className="w-full h-full object-cover" />
+                    <div className="w-20 h-20 bg-white rounded-xl shadow-sm overflow-hidden flex-shrink-0">
+                      {story.image_url?.startsWith("/") || story.image_url?.startsWith("http") ? (
+                        <img src={story.image_url} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-3xl">{story.cover}</span>
+                        <div className="w-full h-full bg-violet-100 flex items-center justify-center text-3xl">
+                          📰
+                        </div>
                       )}
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-slate-800 text-lg leading-tight">{story.title}</h3>
-                      <p className="text-sm text-slate-500 mt-1">{story.source}</p>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-slate-800 text-lg leading-tight line-clamp-2">{story.title}</h3>
+                      <p className="text-sm text-slate-500 mt-1">{story.author}</p>
                     </div>
                   </div>
-                  <p className="text-slate-600 text-sm">{story.description}</p>
-                  <a
-                    href={story.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-3 bg-violet-600 text-white text-center rounded-xl font-semibold hover:bg-violet-700 transition mt-2"
+                  <p className="text-slate-600 text-sm leading-relaxed">{story.short_description}</p>
+                  <button
+                    className="w-full py-3 bg-violet-600 text-white text-center rounded-xl font-semibold hover:bg-violet-700 transition"
+                    onClick={() => {
+                      setShowCommunity(false);
+                      navigate(`/article/${story.article_id}`);
+                    }}
                   >
                     Read Story
-                  </a>
+                  </button>
                 </div>
               ))}
-              <div className="text-center py-6 text-slate-400">
-                <p className="text-sm">More stories coming soon!</p>
-              </div>
+              {communityStories.length === 0 && (
+                <div className="text-center py-10 text-slate-400">
+                  <div className="text-4xl mb-2">📭</div>
+                  <p className="text-sm">More stories coming soon!</p>
+                </div>
+              )}
+              <div className="h-4" /> {/* Bottom padding for better scroll feel */}
             </div>
           </div>
         </div>

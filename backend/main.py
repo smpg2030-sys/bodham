@@ -6,6 +6,10 @@ from routes.admin import router as admin_router
 from routes.posts import router as posts_router
 from routes.friends import router as friends_router
 from routes.videos import router as videos_router
+from routes.news import router as news_router
+from routes.upload import router as upload_router
+import os
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="MindRise API", version="1.0.0")
 
@@ -69,6 +73,7 @@ app.include_router(posts_router, prefix=prefix)
 app.include_router(upload_router, prefix=prefix)
 app.include_router(friends_router, prefix=prefix)
 app.include_router(videos_router, prefix=prefix)
+app.include_router(news_router, prefix=prefix)
 
 
 @app.get(prefix + "/health")

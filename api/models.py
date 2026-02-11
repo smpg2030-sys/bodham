@@ -55,6 +55,8 @@ class PostResponse(BaseModel):
 class VideoCreate(BaseModel):
     title: str | None = None
     video_url: str
+    user_id: str
+    author_name: str
 
 class VideoResponse(BaseModel):
     id: str

@@ -7,14 +7,14 @@ from datetime import datetime
 router = APIRouter(prefix="/videos", tags=["videos"])
 
 @router.post("/", response_model=VideoResponse)
-def create_video(video: VideoCreate, user_id: str, author_name: str):
+def create_video(video: VideoCreate):
     db = get_db()
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established")
     
     doc = {
-        "user_id": user_id,
-        "author_name": author_name,
+        "user_id": video.user_id,
+        "author_name": video.author_name,
         "title": video.title,
         "video_url": video.video_url,
         "status": "pending",
