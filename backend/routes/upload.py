@@ -9,13 +9,19 @@ from datetime import datetime
 router = APIRouter(tags=["upload"])
 
 # Configure Cloudinary
-if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
-    cloudinary.config(
-        cloud_name=CLOUDINARY_CLOUD_NAME,
-        api_key=CLOUDINARY_API_KEY,
-        api_secret=CLOUDINARY_API_SECRET,
-        secure=True
-    )
+def configure_cloudinary():
+    if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
+        cloudinary.config(
+            cloud_name=CLOUDINARY_CLOUD_NAME,
+            api_key=CLOUDINARY_API_KEY,
+            api_secret=CLOUDINARY_API_SECRET,
+            secure=True
+        )
+        return True
+    return False
+
+# Initial config attempt
+configure_cloudinary()
 
 @router.post("/upload-video")
 async def upload_video(
@@ -23,8 +29,20 @@ async def upload_video(
     user_id: str = Form(...),
     caption: str = Form("")
 ):
-    if not (CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET):
-        raise HTTPException(status_code=500, detail="Cloudinary credentials not configured.")
+    missing_keys = []
+    if not CLOUDINARY_CLOUD_NAME: missing_keys.append("CLOUDINARY_CLOUD_NAME")
+    if not CLOUDINARY_API_KEY: missing_keys.append("CLOUDINARY_API_KEY")
+    if not CLOUDINARY_API_SECRET: missing_keys.append("CLOUDINARY_API_SECRET")
+    
+    if missing_keys:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Cloudinary configuration missing: {', '.join(missing_keys)}. "
+                   f"Please set these in your Vercel Project Environment Variables."
+        )
+    
+    # Re-verify config
+    configure_cloudinary()
     
     try:
         # 1. Upload to Cloudinary -> MindRise_Videos folder
