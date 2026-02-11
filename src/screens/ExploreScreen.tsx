@@ -27,16 +27,22 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase();
 
+import { CommunityStory } from "../types";
+
+// ... existing imports
+
+// ... existing consts
+
 export default function ExploreScreen() {
   const navigate = useNavigate();
   const [showEbooks, setShowEbooks] = useState(false);
   const [showCommunity, setShowCommunity] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [hasEbookAccess, setHasEbookAccess] = useState(false);
-  const [communityStories, setCommunityStories] = useState<any[]>([]);
+  const [communityStories, setCommunityStories] = useState<CommunityStory[]>([]);
 
   React.useEffect(() => {
-    fetch(`${API_BASE}/news`)
+    fetch(`${API_BASE}/community-stories`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch");
         return res.json();
@@ -136,7 +142,7 @@ export default function ExploreScreen() {
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {communityStories.map((story, i) => (
-                <div key={i} className="bg-slate-50 rounded-2xl p-4 flex flex-col gap-3 border border-slate-100 shadow-sm">
+                <div key={story.id || i} className="bg-slate-50 rounded-2xl p-4 flex flex-col gap-3 border border-slate-100 shadow-sm">
                   <div className="flex gap-4">
                     <div className="w-20 h-20 bg-white rounded-xl shadow-sm overflow-hidden flex-shrink-0">
                       {story.image_url?.startsWith("/") || story.image_url?.startsWith("http") ? (
@@ -152,12 +158,12 @@ export default function ExploreScreen() {
                       <p className="text-sm text-slate-500 mt-1">{story.author}</p>
                     </div>
                   </div>
-                  <p className="text-slate-600 text-sm leading-relaxed">{story.short_description}</p>
+                  <p className="text-slate-600 text-sm leading-relaxed line-clamp-3">{story.description}</p>
                   <button
                     className="w-full py-3 bg-violet-600 text-white text-center rounded-xl font-semibold hover:bg-violet-700 transition"
                     onClick={() => {
                       setShowCommunity(false);
-                      navigate(`/article/${story.article_id}`);
+                      navigate(`/story/${story.id}`);
                     }}
                   >
                     Read Story

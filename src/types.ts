@@ -56,3 +56,13 @@ export interface AppNotification {
     type: "friend_request" | "request_accepted" | "general";
     created_at: string;
 }
+
+export interface CommunityStory {
+    id: string;
+    title: string;
+    description: string;
+    content: string;
+    image_url?: string;
+    author?: string;
+    created_at: string;
+}

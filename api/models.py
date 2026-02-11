@@ -68,6 +68,7 @@ class PostResponse(BaseModel):
 
 class VideoCreate(BaseModel):
     title: str | None = None
+    caption: str | None = None
     video_url: str
     user_id: str
     author_name: str
@@ -78,7 +79,18 @@ class VideoResponse(BaseModel):
     author_name: str
     author_email: str | None = None
     title: str | None = None
+    caption: str | None = None
     video_url: str
     status: str  # "pending", "approved", "rejected"
     created_at: str
     rejection_reason: str | None = None
+
+
+class NewsArticle(BaseModel):
+    article_id: str
+    title: str
+    short_description: str
+    content: str
+    image_url: str | None = None
+    author: str
+    published_at: str
