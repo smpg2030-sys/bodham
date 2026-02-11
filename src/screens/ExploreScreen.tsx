@@ -19,6 +19,14 @@ const EBOOKS = [
   { title: "Calm Mind Journey", author: "Sarah Miller", cover: "📔", price: "Premium" },
 ];
 
+const getApiBase = () => {
+  const base = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000" : "/api");
+  if (base.startsWith("http")) return base;
+  return window.location.origin + (base.startsWith("/") ? "" : "/") + base;
+};
+
+const API_BASE = getApiBase();
+
 export default function ExploreScreen() {
   const navigate = useNavigate();
   const [showEbooks, setShowEbooks] = useState(false);
@@ -28,10 +36,22 @@ export default function ExploreScreen() {
   const [communityStories, setCommunityStories] = useState<any[]>([]);
 
   React.useEffect(() => {
-    fetch("http://localhost:8000/api/news")
-      .then((res) => res.json())
-      .then((data) => setCommunityStories(data))
-      .catch((err) => console.error("Failed to fetch stories:", err));
+    fetch(`${API_BASE}/news`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch");
+        return res.json();
+      })
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setCommunityStories(data);
+        } else {
+          setCommunityStories([]);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch stories:", err);
+        setCommunityStories([]);
+      });
   }, []);
 
   const handleSubscribe = () => {
