@@ -85,7 +85,8 @@ export default function AdminPanelScreen() {
           fetchData();
         }
       } else {
-        alert("Failed to update post status");
+        const errorText = await res.text();
+        alert(`Failed to update post status: ${errorText}`);
       }
     } catch (error) {
       console.error("Error updating post", error);
