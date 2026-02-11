@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Play, Pause, Volume2, VolumeX, Maximize2, Minimize2 } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, Maximize2 } from "lucide-react";
 
 interface VideoPlayerProps {
     src: string;
@@ -16,7 +16,7 @@ export default function VideoPlayer({ src, poster, className = "", autoPlay = fa
     const [progress, setProgress] = useState(0);
     const [duration, setDuration] = useState(0);
     const [showControls, setShowControls] = useState(true);
-    const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const controlsTimeoutRef = useRef<any>(null);
 
     const togglePlay = () => {
         if (videoRef.current) {

@@ -31,6 +31,8 @@ def get_all_videos():
             doc["created_at"] = datetime.utcnow().isoformat()
         if "user_id" not in doc:
             doc["user_id"] = "system"
+        if "caption" not in doc:
+            doc["caption"] = ""
             
         results.append(doc)
     return results

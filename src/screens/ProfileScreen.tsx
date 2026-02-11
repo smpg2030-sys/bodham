@@ -86,9 +86,11 @@ export default function ProfileScreen() {
   };
 
   const fetchMyVideos = async () => {
+    if (!user?.id) return;
     setLoadingVideos(true);
     try {
-      const res = await fetch(`${API_BASE}/videos/my?user_id=${user?.id}`);
+      // Fetch only approved videos for the profile view as requested
+      const res = await fetch(`${API_BASE}/videos/user/${user.id}`);
       if (res.ok) {
         const data = await res.json();
         setMyVideos(data);
@@ -291,16 +293,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const getVideoStatusBadge = (video: Video) => {
-    switch (video.status) {
-      case "approved":
-        return <span className="px-2 py-0.5 bg-green-100/50 text-green-700 text-[9px] font-bold uppercase rounded-lg border border-green-200">Approved</span>;
-      case "rejected":
-        return <span className="px-2 py-0.5 bg-rose-100/50 text-rose-700 text-[9px] font-bold uppercase rounded-lg border border-rose-200">Rejected</span>;
-      default:
-        return <span className="px-2 py-0.5 bg-amber-100/50 text-amber-700 text-[9px] font-bold uppercase rounded-lg border border-amber-200">Pending</span>;
-    }
-  };
 
   if (!user) return null;
   const isAdmin = user?.role === "admin";
@@ -580,33 +572,33 @@ export default function ProfileScreen() {
               ) : (
                 myVideos.map(video => (
                   <div key={video.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm relative group">
-                    <div className="aspect-[9/16] bg-slate-900 flex items-center justify-center overflow-hidden">
-                      {video.status === "approved" ? (
-                        <VideoPlayer
-                          src={video.video_url.startsWith("/static") ? `${API_BASE}${video.video_url}` : video.video_url}
-                          className="w-full h-full"
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center gap-4 text-white/50 p-6 text-center">
-                          <VideoIcon className="w-10 h-10 opacity-20" />
-                          <p className="text-xs font-medium">Video is {video.status}</p>
-                        </div>
-                      )}
+                    <div className="aspect-[9/16] bg-black flex items-center justify-center overflow-hidden">
+                      <VideoPlayer
+                        src={video.video_url.startsWith("/static") ? `${API_BASE}${video.video_url}` : video.video_url}
+                        className="w-full h-full"
+                      />
                     </div>
                     <div className="p-3">
-                      <h4 className="text-xs font-bold text-slate-800 truncate mb-1">{video.title || "No Title"}</h4>
+                      <h4 className="text-xs font-bold text-slate-800 truncate mb-1">
+                        {video.title || "Untitled Reel"}
+                      </h4>
+                      {video.caption && (
+                        <p className="text-[10px] text-slate-500 line-clamp-2 mb-2 italic">
+                          "{video.caption}"
+                        </p>
+                      )}
                       <div className="flex justify-between items-center">
-                        {getVideoStatusBadge(video)}
-                        <button onClick={() => handleDeleteVideo(video.id)} className="p-1.5 text-slate-300 hover:text-rose-500 rounded-full hover:bg-rose-50 transition-colors">
+                        <span className="text-[9px] font-bold uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                          Approved
+                        </span>
+                        <button
+                          onClick={() => handleDeleteVideo(video.id)}
+                          className="p-1.5 text-slate-300 hover:text-rose-500 rounded-full hover:bg-rose-50 transition-colors"
+                        >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
-                    {video.status === "rejected" && video.rejection_reason && (
-                      <div className="absolute top-2 left-2 right-2 bg-rose-500/90 backdrop-blur-md p-3 rounded-xl text-white text-[10px] font-medium leading-tight shadow-lg border border-white/20">
-                        Rejected: {video.rejection_reason}
-                      </div>
-                    )}
                   </div>
                 ))
               )}

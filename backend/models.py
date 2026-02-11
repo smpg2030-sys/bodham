@@ -54,6 +54,7 @@ class PostResponse(BaseModel):
 
 class VideoCreate(BaseModel):
     title: str | None = None
+    caption: str | None = None
     video_url: str
     user_id: str
     author_name: str
@@ -65,6 +66,7 @@ class VideoResponse(BaseModel):
     author_name: str
     author_email: str | None = None
     title: str | None = None
+    caption: str | None = None
     video_url: str
     status: str  # "pending", "approved", "rejected"
     created_at: str

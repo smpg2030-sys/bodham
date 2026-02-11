@@ -321,16 +321,27 @@ export default function HomeFeedScreen() {
                     </div>
                     <div>
                       <p className="font-bold text-slate-800 text-sm">{video.author_name}</p>
-                      <p className="text-[10px] text-slate-400 font-medium">{video.created_at ? new Date(video.created_at).toLocaleDateString() : 'Just now'}</p>
+                      <p className="text-[10px] text-slate-400 font-medium">
+                        {video.created_at ? new Date(video.created_at).toLocaleDateString() : 'Just now'}
+                      </p>
                     </div>
                   </div>
-                  <h3 className="px-4 pb-3 font-bold text-slate-800">{video.title}</h3>
-                  <div className="aspect-[9/16] max-h-[600px] w-full bg-black">
+
+                  <div className="aspect-[9/16] max-h-[600px] w-full bg-black shadow-inner">
                     <VideoPlayer
                       src={video.video_url.startsWith("/static") ? `${API_BASE}${video.video_url}` : video.video_url}
                       className="h-full"
                     />
                   </div>
+
+                  {video.caption && (
+                    <div className="p-4 pt-3">
+                      <p className="text-slate-700 text-sm leading-relaxed">
+                        <span className="font-bold mr-2 text-slate-900">{video.author_name}</span>
+                        {video.caption}
+                      </p>
+                    </div>
+                  )}
                 </motion.div>
               ))
             )}
