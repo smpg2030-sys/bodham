@@ -480,7 +480,16 @@ export default function ProfileScreen() {
             <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-wider mt-1">Videos</p>
           </div>
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 text-center">
-            <p className="text-2xl font-bold text-slate-800">12</p>
+            <p className="text-2xl font-bold text-slate-800">
+              {(() => {
+                if (!user.created_at) return 0;
+                const created = new Date(user.created_at);
+                const now = new Date();
+                const diffTime = Math.abs(now.getTime() - created.getTime());
+                const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                return Math.max(1, days); // Minimum 1 day streak
+              })()}
+            </p>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Streak</p>
           </div>
         </div>
