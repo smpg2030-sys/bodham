@@ -19,13 +19,43 @@ export default function GrowthTree({ createdAt, variant = "full", onClick }: Gro
     const days = calculateDays();
 
     const getStage = () => {
+        const sproutColor = "text-emerald-500";
+        const sproutIcon = (size: number) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={sproutColor}>
+                <motion.path
+                    d="M12 22C12 22 12 18 12 13"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                />
+                <motion.path
+                    initial={{ rotate: -10, originX: "100%", originY: "100%" }}
+                    animate={{ rotate: [-10, 5, -10] }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                    d="M12 13C12 13 8 13 4 9C4 9 3 13 12 13Z"
+                    fill="currentColor"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                />
+                <motion.path
+                    initial={{ rotate: 10, originX: "0%", originY: "100%" }}
+                    animate={{ rotate: [10, -5, 10] }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                    d="M12 13C12 13 16 13 20 9C20 9 21 13 12 13Z"
+                    fill="currentColor"
+                    stroke="currentColor"
+                    strokeWidth="1"
+                />
+            </svg>
+        );
+
         if (days >= 90) return { icon: <TreePine size={variant === "mini" ? 20 : 64} className="text-yellow-400" />, label: "Glowing Tree", sub: "90+ Days", color: "from-yellow-400 to-amber-600", effect: true };
         if (days >= 60) return { icon: <Flower2 size={variant === "mini" ? 20 : 64} className="text-pink-400" />, label: "Flowering Tree", sub: "60+ Days", color: "from-pink-400 to-rose-600" };
         if (days >= 30) return { icon: <TreePine size={variant === "mini" ? 20 : 64} className="text-green-500" />, label: "Healthy Tree", sub: "30+ Days", color: "from-green-500 to-emerald-700" };
         if (days >= 14) return { icon: <TreePine size={variant === "mini" ? 18 : 48} className="text-green-400" />, label: "Growing Tree", sub: "14+ Days", color: "from-green-400 to-green-600" };
         if (days >= 7) return { icon: <Leaf size={variant === "mini" ? 18 : 40} className="text-green-300" />, label: "Small Plant", sub: "7+ Days", color: "from-green-300 to-green-500" };
-        if (days >= 3) return { icon: <Sprout size={variant === "mini" ? 16 : 32} className="text-green-200" />, label: "Small Sprout", sub: "3+ Days", color: "from-green-200 to-green-400" };
-        return { icon: <div className={`${variant === "mini" ? "w-2 h-2" : "w-4 h-4"} rounded-full bg-amber-800`} />, label: "Seed", sub: "Started", color: "from-amber-700 to-amber-900" };
+        if (days >= 3) return { icon: sproutIcon(variant === "mini" ? 20 : 48), label: "Small Sprout", sub: "3+ Days", color: "from-emerald-300 to-emerald-500" };
+        return { icon: sproutIcon(variant === "mini" ? 16 : 32), label: "Just Born", sub: "Day 1", color: "from-emerald-400 to-teal-500" };
     };
 
     const stage = getStage();
