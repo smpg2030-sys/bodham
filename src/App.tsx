@@ -42,10 +42,18 @@ function AppRoutes() {
         <Route path="/login" element={<LoginRedirect />} />
         <Route path="/verify" element={<VerifyOTPScreen />} />
         <Route
-          path="/support"
+          path="/story/:storyId"
           element={
             <ProtectedRoute>
-              <TherapistSupportScreen />
+              <StoryDetailScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/article/:articleId"
+          element={
+            <ProtectedRoute>
+              <ArticleDetailScreen />
             </ProtectedRoute>
           }
         />
