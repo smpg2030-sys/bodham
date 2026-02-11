@@ -227,7 +227,7 @@ export default function HomeFeedScreen() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen bg-[#f8fafc] pb-24"
+      className="w-full"
     >
       {/* Header ... */}
       <header className="sticky top-0 z-20 glass px-5 py-4 flex items-center justify-between border-b border-white/40 shadow-sm">

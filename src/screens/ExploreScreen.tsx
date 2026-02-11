@@ -65,7 +65,7 @@ export default function ExploreScreen() {
   };
 
   return (
-    <div className="app-container min-h-screen bg-[#f8f9fa] pb-20">
+    <div className="w-full min-h-screen bg-white">
       <header className="sticky top-0 z-10 bg-white border-b border-slate-100 px-4 py-4 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-800">Explore</h1>
         <button type="button" className="p-2 text-slate-600" aria-label="Notifications">

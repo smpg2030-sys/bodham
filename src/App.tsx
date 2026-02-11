@@ -88,10 +88,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <div className="min-h-screen flex flex-col items-center bg-[#f8f9fa]">
-          <div className="w-full max-w-[480px] min-h-screen flex flex-col app-container relative bg-surface-50 shadow-2xl overflow-hidden">
-            <AppRoutes />
-          </div>
+        <div className="min-h-screen bg-[#f8f9fa]">
+          <AppRoutes />
         </div>
       </AuthProvider>
     </BrowserRouter>
