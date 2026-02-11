@@ -6,7 +6,7 @@ from config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SEC
 from database import get_client
 from datetime import datetime
 
-router = APIRouter(prefix="/upload", tags=["upload"])
+router = APIRouter(tags=["upload"])
 
 # Configure Cloudinary
 if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
@@ -17,7 +17,7 @@ if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
         secure=True
     )
 
-@router.post("/video")
+@router.post("/upload-video")
 async def upload_video(
     file: UploadFile = File(...),
     user_id: str = Form(...),
@@ -52,10 +52,9 @@ async def upload_video(
         result = collection.insert_one(record)
         
         return {
-            "id": str(result.inserted_id),
-            "video_url": video_url,
-            "status": "Pending",
-            "message": "Video uploaded successfully and is pending approval."
+            "success": True,
+            "videoUrl": video_url,
+            "videoId": str(result.inserted_id)
         }
     except Exception as e:
         print(f"Cloudinary Upload Error: {e}")

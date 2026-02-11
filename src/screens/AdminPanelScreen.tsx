@@ -101,10 +101,10 @@ export default function AdminPanelScreen() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/admin/videos/${videoId}/status?role=${user?.role}`, {
-        method: "PUT",
+      const res = await fetch(`${API_BASE}/approve-video?role=${user?.role}`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, rejection_reason: reason })
+        body: JSON.stringify({ video_id: videoId, status, rejection_reason: reason })
       });
 
       if (res.ok) {

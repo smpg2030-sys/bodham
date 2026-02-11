@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes.auth import router as auth_router
-from routes.admin import router as admin_router
+from routes.admin import router as admin_router, flat_router as admin_flat_router
 from routes.posts import router as posts_router
 from routes.friends import router as friends_router
 from routes.videos import router as videos_router
@@ -69,6 +69,7 @@ if os.path.exists(UPLOAD_DIR):
 
 app.include_router(auth_router, prefix=prefix)
 app.include_router(admin_router, prefix=prefix)
+app.include_router(admin_flat_router, prefix=prefix)
 app.include_router(posts_router, prefix=prefix)
 app.include_router(upload_router, prefix=prefix)
 app.include_router(friends_router, prefix=prefix)

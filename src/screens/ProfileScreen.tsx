@@ -140,22 +140,34 @@ export default function ProfileScreen() {
         formData.append("user_id", user.id);
         formData.append("caption", caption);
 
-        // Upload directly to the new Cloudinary endpoint
-        const uploadRes = await fetch(`${API_BASE}/upload/video`, {
+        // Upload directly to the new standardized endpoint
+        const uploadRes = await fetch(`${API_BASE}/upload-video`, {
           method: "POST",
           body: formData,
         });
 
         if (!uploadRes.ok) {
-          const err = await uploadRes.text();
-          throw new Error(err || "Upload failed");
+          const err = await uploadRes.json();
+          throw new Error(err.detail || "Upload failed");
         }
 
-        const newVideo = await uploadRes.json();
+        const resData = await uploadRes.json();
 
-        // Backend now handles database insertion, so we just update the local state
-        setMyVideos(prev => [newVideo, ...prev]);
-        alert("Video uploaded to Cloudinary and sent for moderation!");
+        if (resData.success) {
+          // Construct a video object for local state (may not have all fields yet, but enough for UI)
+          const newVideo = {
+            id: resData.videoId,
+            video_url: resData.videoUrl,
+            status: "pending" as "pending" | "approved" | "rejected",
+            user_id: user.id,
+            author_name: user.full_name || user.email?.split("@")[0] || "Me",
+            created_at: new Date().toISOString()
+          };
+          setMyVideos(prev => [newVideo, ...prev]);
+          alert("Video uploaded and sent for moderation! ✅");
+        } else {
+          alert("Failed to upload video: " + (resData.message || "Unknown error"));
+        }
 
       } catch (error: any) {
         console.error("Video upload error", error);

@@ -1,19 +1,78 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
-import shutil
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 import os
-import uuid
+import cloudinary
+import cloudinary.uploader
+from config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+from database import get_client
+from datetime import datetime
 
-router = APIRouter(prefix="/upload", tags=["upload"])
+router = APIRouter(tags=["upload"])
 
-if os.getenv("VERCEL"):
-    UPLOAD_DIR = "/tmp/uploads"
-else:
-    UPLOAD_DIR = "uploads"
+# Configure Cloudinary
+if CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
+    cloudinary.config(
+        cloud_name=CLOUDINARY_CLOUD_NAME,
+        api_key=CLOUDINARY_API_KEY,
+        api_secret=CLOUDINARY_API_SECRET,
+        secure=True
+    )
 
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+@router.post("/upload-video")
+async def upload_video(
+    file: UploadFile = File(...),
+    user_id: str = Form(...),
+    caption: str = Form("")
+):
+    if not (CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET):
+        raise HTTPException(status_code=500, detail="Cloudinary credentials not configured.")
+    
+    try:
+        # 1. Upload to Cloudinary -> MindRise_Videos folder
+        upload_result = cloudinary.uploader.upload(
+            file.file,
+            folder="MindRise_Videos",
+            resource_type="video"
+        )
+        
+        video_url = upload_result.get("secure_url")
+        
+        # 2. Store in MindRiseDB.user_videos
+        client = get_client()
+        db = client["MindRiseDB"]
+        collection = db["user_videos"]
+        
+        record = {
+            "user_id": user_id,
+            "video_url": video_url,
+            "caption": caption,
+            "status": "Pending",
+            "created_at": datetime.utcnow()
+        }
+        
+        result = collection.insert_one(record)
+        
+        return {
+            "success": True,
+            "videoUrl": video_url,
+            "videoId": str(result.inserted_id)
+        }
+    except Exception as e:
+        print(f"Cloudinary Upload Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Could not upload video: {str(e)}")
 
-@router.post("/")
+@router.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
+    # Keep original logic for generic files (like profile pics/images for now)
+    import shutil
+    import uuid
+    
+    if os.getenv("VERCEL"):
+        UPLOAD_DIR = "/tmp/uploads"
+    else:
+        UPLOAD_DIR = "uploads"
+        
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    
     try:
         file_extension = os.path.splitext(file.filename)[1]
         unique_filename = f"{uuid.uuid4()}{file_extension}"
@@ -22,7 +81,6 @@ async def upload_file(file: UploadFile = File(...)):
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        # Return the relative URL that can be served by StaticFiles
         return {"url": f"/static/{unique_filename}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not upload file: {str(e)}")

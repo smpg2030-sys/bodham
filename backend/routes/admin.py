@@ -2,10 +2,14 @@ from fastapi import APIRouter, HTTPException
 from typing import List
 from bson import ObjectId
 from pydantic import BaseModel
-from database import get_db
+from database import get_db, get_client
 from models import UserResponse, PostResponse, VideoResponse
+from datetime import datetime
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+# Also create a flat router for specific user requested paths like /api/approve-video
+flat_router = APIRouter(tags=["admin_flat"])
 
 class PostStatusUpdate(BaseModel):
     status: str
@@ -13,8 +17,6 @@ class PostStatusUpdate(BaseModel):
 
 @router.get("/users", response_model=List[UserResponse])
 def get_all_users(role: str | None = None):
-    # For now, we expect the frontend to pass the role or we'd ideally use a token
-    # This is a placeholder for proper JWT/Session auth
     if role != "admin":
          raise HTTPException(status_code=403, detail="Forbidden: Admin access required")
     
@@ -47,11 +49,9 @@ def get_stats(role: str):
     email_users = db.users.count_documents({"email": {"$ne": None}})
     mobile_users = db.users.count_documents({"mobile": {"$ne": None}})
     
-    # Count pending posts from the pending collection
     pending_posts = db.pending_posts.count_documents({"status": "pending"})
     
     # Count pending videos from MindRiseDB
-    from database import get_client
     client = get_client()
     db_videos = client["MindRiseDB"]
     pending_videos = db_videos.user_videos.count_documents({"status": {"$in": ["pending", "Pending"]}})
@@ -84,10 +84,8 @@ def get_posts(role: str, status: str = "all"):
         posts_cursor = combined
         
     results = []
-    # Collect user IDs for batch lookup if needed
     for doc in posts_cursor:
         doc["id"] = str(doc["_id"])
-        # Fetch author email for admin visibility
         user = db.users.find_one({"_id": ObjectId(doc["user_id"])})
         if user:
             doc["author_email"] = user.get("email")
@@ -95,59 +93,29 @@ def get_posts(role: str, status: str = "all"):
         results.append(doc)
     return results
 
-
 @router.put("/posts/{post_id}/status")
 def update_post_status(post_id: str, update: PostStatusUpdate, role: str):
     if role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     db = get_db()
-    if db is None:
-        raise HTTPException(status_code=503, detail="Database connection not established")
-        
     if update.status == "approved":
-        # Move post from pending_posts to posts
         post = db.pending_posts.find_one({"_id": ObjectId(post_id)})
         if not post:
-            # Check if it's already approved (maybe a retry)
-            already_approved = db.posts.find_one({"_id": ObjectId(post_id)})
-            if already_approved:
-                return {"message": "Post already approved"}
-            raise HTTPException(status_code=404, detail="Post not found in pending")
-        
+            return {"message": "Post already approved or not found"}
         post["status"] = "approved"
         db.posts.insert_one(post)
         db.pending_posts.delete_one({"_id": ObjectId(post_id)})
-        return {"message": "Post approved and moved to live feed"}
-    
-    else:  # rejected
-        # First try to update in pending_posts (for pending or already rejected posts)
-        result = db.pending_posts.update_one(
-            {"_id": ObjectId(post_id)},
-            {"$set": {"status": "rejected", "rejection_reason": update.rejection_reason}}
-        )
-        
-        if result.matched_count == 0:
-            # Not found in pending_posts, check if it's in posts (already approved)
-            post = db.posts.find_one({"_id": ObjectId(post_id)})
-            if post:
-                # Move back to pending_posts with rejected status
-                post["status"] = "rejected"
-                post["rejection_reason"] = update.rejection_reason
-                db.pending_posts.insert_one(post)
-                db.posts.delete_one({"_id": ObjectId(post_id)})
-                return {"message": "Post approval revoked and rejected"}
-            else:
-                raise HTTPException(status_code=404, detail="Post not found in pending or approved posts")
-            
+        return {"message": "Post approved"}
+    else:
+        db.pending_posts.update_one({"_id": ObjectId(post_id)}, {"$set": {"status": "rejected", "rejection_reason": update.rejection_reason}})
         return {"message": "Post rejected"}
 
 @router.get("/videos", response_model=List[VideoResponse])
 def get_videos(role: str, status: str = "all"):
     if role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
-    from database import get_client
     client = get_client()
-    db_mindrise = client["mindrise"] # For users
+    db_mindrise = client["mindrise"]
     db_videos = client["MindRiseDB"]
     
     query = {}
@@ -163,17 +131,11 @@ def get_videos(role: str, status: str = "all"):
     results = []
     for doc in videos_cursor:
         doc["id"] = str(doc["_id"])
-        # Fetch author email from the main mindrise db users collection
         user = db_mindrise.users.find_one({"_id": ObjectId(doc["user_id"])})
         if user:
             doc["author_email"] = user.get("email")
-            if "author_name" not in doc:
-                doc["author_name"] = user.get("full_name") or user.get("email").split("@")[0]
-        
-        # Lowercase status for frontend consistency
         if "status" in doc:
             doc["status"] = doc["status"].lower()
-            
         results.append(doc)
     return results
 
@@ -181,14 +143,9 @@ def get_videos(role: str, status: str = "all"):
 def update_video_status(video_id: str, update: PostStatusUpdate, role: str):
     if role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
-    from database import get_client
     client = get_client()
     db = client["MindRiseDB"]
-    
-    # Map lowercase status to the requested DB format if needed
-    # (Approved/Rejected/Pending)
     db_status = update.status.capitalize() 
-    
     result = db.user_videos.update_one(
         {"_id": ObjectId(video_id)},
         {"$set": {
@@ -197,8 +154,33 @@ def update_video_status(video_id: str, update: PostStatusUpdate, role: str):
             "updated_at": datetime.utcnow().isoformat()
         }}
     )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Video not found")
+    return {"message": f"Video {update.status} successfully"}
+
+# User requested standardized endpoint
+@flat_router.post("/approve-video")
+def approve_video_standard(payload: dict, role: str = "admin"):
+    video_id = payload.get("video_id")
+    status = payload.get("status", "approved")
+    rejection_reason = payload.get("rejection_reason")
+    
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    client = get_client()
+    db = client["MindRiseDB"]
+    
+    result = db.user_videos.update_one(
+        {"_id": ObjectId(video_id)},
+        {"$set": {
+            "status": status.capitalize(),
+            "rejection_reason": rejection_reason,
+            "updated_at": datetime.utcnow().isoformat()
+        }}
+    )
     
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Video not found")
         
-    return {"message": f"Video {update.status} successfully"}
+    return {"success": True, "message": f"Video {status} successfully"}
