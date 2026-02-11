@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ChevronLeft, Share2, Clock, User } from "lucide-react";
 import { motion } from "framer-motion";
-import { API_BASE } from "../config";
 
 export default function ArticleDetailScreen() {
     const { articleId } = useParams();
@@ -11,7 +10,7 @@ export default function ArticleDetailScreen() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetch(`${API_BASE}/news/${articleId}`)
+        fetch(`http://localhost:8000/api/news/${articleId}`)
             .then((res) => {
                 if (!res.ok) throw new Error("Article not found");
                 return res.json();

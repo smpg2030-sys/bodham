@@ -4,7 +4,14 @@ import { useAuth } from "../context/AuthContext";
 import { Post, User, Video } from "../types";
 import { Users, FileText, CheckCircle, XCircle, Video as VideoIcon } from "lucide-react";
 import VideoPlayer from "../components/VideoPlayer";
-import { API_BASE } from "../config";
+
+const getApiBase = () => {
+  const base = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000" : "/api");
+  if (base.startsWith("http")) return base;
+  return window.location.origin + (base.startsWith("/") ? "" : "/") + base;
+};
+
+const API_BASE = getApiBase();
 
 export default function AdminPanelScreen() {
   const navigate = useNavigate();

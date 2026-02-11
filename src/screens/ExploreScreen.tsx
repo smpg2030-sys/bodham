@@ -28,7 +28,7 @@ export default function ExploreScreen() {
   const [communityStories, setCommunityStories] = useState<any[]>([]);
 
   React.useEffect(() => {
-    fetch(`${API_BASE}/news`)
+    fetch("http://localhost:8000/api/news")
       .then((res) => res.json())
       .then((data) => setCommunityStories(data))
       .catch((err) => console.error("Failed to fetch stories:", err));

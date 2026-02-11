@@ -1,7 +1,14 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { API_BASE } from "../config";
+
+const getApiBase = () => {
+    const base = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8001" : "/api");
+    if (base.startsWith("http")) return base;
+    return window.location.origin + (base.startsWith("/") ? "" : "/") + base;
+};
+
+const API_BASE = getApiBase();
 
 export default function VerifyOTPScreen() {
     const navigate = useNavigate();
