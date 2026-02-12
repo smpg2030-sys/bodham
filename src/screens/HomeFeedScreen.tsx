@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, Plus, Bell, Image as ImageIcon, Video as VideoIcon, Camera, ArrowLeft, CheckCircle2, AlertCircle, Loader2, MessageCircle } from "lucide-react";
+import { Search, Plus, Bell, Image as ImageIcon, Video as VideoIcon, Camera, ArrowLeft, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useHomeRefresh } from "../context/HomeRefreshContext";
 import { Post, FriendRequest, AppNotification, CommunityStory } from "../types";
@@ -422,7 +422,7 @@ export default function HomeFeedScreen() {
         )}
       </AnimatePresence>
 
-      <header className="sticky top-0 z-20 bg-white/80 dark:bg-black/80 backdrop-blur-xl px-4 py-4 flex items-center justify-between border-b border-slate-100/50 dark:border-zinc-800 shadow-sm dark:shadow-none">
+      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl px-4 py-4 flex items-center justify-between border-b border-slate-100/50 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="relative group">
             <div
@@ -461,7 +461,7 @@ export default function HomeFeedScreen() {
               )}
             </div>
           </div>
-          <h1 className="text-lg font-bold text-slate-800 dark:text-white tracking-tight truncate max-w-[200px]">
+          <h1 className="text-lg font-bold text-slate-800 tracking-tight truncate max-w-[200px]">
             {`Welcome, ${user?.full_name || user?.email?.split("@")[0] || "Friend"}`}
           </h1>
         </div>
@@ -502,77 +502,19 @@ export default function HomeFeedScreen() {
         </div>
       </header>
 
-      <header className="sticky top-0 z-20 bg-black/80 backdrop-blur-xl px-4 py-3 flex items-center justify-between border-b border-slate-300">
-        <div className="flex items-center gap-4">
-          <AnimatePresence>
-            {showSearch ? (
-              <motion.div
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: "100%", opacity: 1 }}
-                exit={{ width: 0, opacity: 0 }}
-                className="flex-1"
-              >
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                  <input
-                    autoFocus
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search Bodham"
-                    className="w-full bg-slate-100 text-white placeholder-slate-500 pl-10 pr-4 py-2 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 border border-transparent"
-                    onBlur={() => !searchQuery && setShowSearch(false)}
-                  />
-                </div>
-              </motion.div>
-            ) : (
-              <motion.h1
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-xl font-bold text-white tracking-tight"
-              >
-                Home
-              </motion.h1>
-            )}
-          </AnimatePresence>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {!showSearch && (
-            <button
-              onClick={() => setShowSearch(true)}
-              className="p-2 text-white hover:bg-slate-200/10 rounded-full transition-colors"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-          )}
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="p-2 text-white hover:bg-slate-200/10 rounded-full transition-colors relative"
-          >
-            <Bell className="w-5 h-5" />
-            {notifications.some(n => !n.read) && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary-500 rounded-full border-2 border-black"></span>
-            )}
-          </button>
-        </div>
-      </header>
-
-      <div className="sticky top-[53px] z-10 bg-black/90 backdrop-blur-sm border-b border-slate-300 overflow-x-auto no-scrollbar">
-        <div className="flex">
+      <div className="sticky top-[73px] z-10 bg-white/90 backdrop-blur-sm px-4 py-3 border-b border-slate-100/50 overflow-x-auto no-scrollbar">
+        <div className="flex gap-2">
           {TABS.map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 px-4 py-4 text-sm font-bold whitespace-nowrap transition-colors relative hover:bg-slate-200/10 ${activeTab === tab
-                ? "text-white"
-                : "text-slate-500"
+              className={`px-5 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-300 shadow-sm ${activeTab === tab
+                ? "bg-slate-800 text-white shadow-slate-200 scale-105"
+                : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300"
                 }`}
             >
               {tab}
-              {activeTab === tab && (
-                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-10 h-1 bg-primary-500 rounded-full" />
-              )}
             </button>
           ))}
         </div>
@@ -585,11 +527,11 @@ export default function HomeFeedScreen() {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-100 dark:border-amber-900/30 rounded-xl p-4 flex items-center justify-between"
+              className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-xl p-4 flex items-center justify-between"
             >
               <div>
-                <p className="font-bold text-amber-800 dark:text-amber-500 text-sm">Complete your profile</p>
-                <p className="text-xs text-amber-600 dark:text-amber-400/80">Add your email and name to recover your account easily.</p>
+                <p className="font-bold text-amber-800 text-sm">Complete your profile</p>
+                <p className="text-xs text-amber-600">Add your email and name to recover your account easily.</p>
               </div>
               <button
                 onClick={() => navigate("/profile", { state: { openEdit: true } })}
@@ -611,16 +553,16 @@ export default function HomeFeedScreen() {
               exit={{ height: 0, opacity: 0, scale: 0.95 }}
               className="overflow-hidden"
             >
-              <div className="p-4 rounded-3xl border-2 shadow-sm flex flex-col gap-3 bg-white dark:bg-zinc-900 border-slate-100 dark:border-zinc-800">
+              <div className="p-4 rounded-3xl border-2 shadow-sm flex flex-col gap-3 bg-white border-slate-100">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
-                    <span className="font-bold text-sm text-slate-700 dark:text-zinc-300">
+                    <span className="font-bold text-sm text-slate-700">
                       Reviewing your reflection...
                     </span>
                   </div>
                   {pendingItem.type === 'video' && (
-                    <div className="w-12 h-12 rounded-lg bg-slate-900 dark:bg-white flex items-center justify-center text-white dark:text-black">
+                    <div className="w-12 h-12 rounded-lg bg-slate-900 flex items-center justify-center text-white">
                       <VideoIcon className="w-5 h-5 animate-pulse" />
                     </div>
                   )}
@@ -640,7 +582,7 @@ export default function HomeFeedScreen() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12 space-y-4">
             <div className="w-8 h-8 border-4 border-emerald-100 border-t-emerald-500 rounded-full animate-spin"></div>
-            <p className="text-slate-400 dark:text-zinc-500 font-medium">Loading feed...</p>
+            <p className="text-slate-400 font-medium">Loading feed...</p>
           </div>
         ) : activeTab === "Stories" ? (
           <div className="grid grid-cols-1 gap-6">
@@ -656,39 +598,37 @@ export default function HomeFeedScreen() {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: index * 0.1 }}
-                  className="border-b border-slate-300 p-4 hover:bg-slate-200/5 transition cursor-pointer"
+                  className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 group transition hover:shadow-md"
                 >
-                  <div className="flex gap-4">
-                    <div className="aspect-video w-full bg-slate-100 dark:bg-zinc-800 relative overflow-hidden rounded-xl border border-slate-300 mb-3">
-                      {story.image_url ? (
-                        <img
-                          src={story.image_url}
-                          alt={story.title}
-                          className="w-full h-full object-cover transition duration-500 group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-4xl">📰</div>
-                      )}
-                      <div className="absolute top-4 left-4">
-                        <span className="bg-emerald-600 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg uppercase tracking-wider">
-                          Community
-                        </span>
-                      </div>
+                  <div className="aspect-video bg-slate-100 relative overflow-hidden">
+                    {story.image_url ? (
+                      <img
+                        src={story.image_url}
+                        alt={story.title}
+                        className="w-full h-full object-cover transition duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-4xl">📰</div>
+                    )}
+                    <div className="absolute top-4 left-4">
+                      <span className="bg-emerald-600 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg uppercase tracking-wider">
+                        Community
+                      </span>
                     </div>
-                    <div className="p-6">
-                      <h2 className="text-lg font-bold text-white mb-2 leading-tight group-hover:underline decoration-white underline-offset-4">
-                        {story.title}
-                      </h2>
-                      <p className="text-slate-500 text-sm leading-relaxed mb-4 line-clamp-3">
-                        {story.description}
-                      </p>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); navigate(`/story/${story.id}`) }}
-                        className="text-primary-500 hover:text-primary-600 font-bold text-sm"
-                      >
-                        Read Full Story
-                      </button>
-                    </div>
+                  </div>
+                  <div className="p-6">
+                    <h2 className="text-xl font-bold text-slate-800 mb-2 leading-tight group-hover:text-emerald-600 transition">
+                      {story.title}
+                    </h2>
+                    <p className="text-slate-600 text-sm leading-relaxed mb-6 line-clamp-3">
+                      {story.description}
+                    </p>
+                    <button
+                      onClick={() => navigate(`/story/${story.id}`)}
+                      className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition shadow-lg shadow-slate-200"
+                    >
+                      Read Full Story
+                    </button>
                   </div>
                 </motion.div>
               ))
@@ -698,9 +638,9 @@ export default function HomeFeedScreen() {
           <div className="grid grid-cols-1 gap-6">
             {posts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="w-20 h-20 bg-emerald-50 dark:bg-zinc-900 rounded-full flex items-center justify-center mb-4 text-3xl">🌿</div>
-                <p className="text-xl font-bold text-slate-700 dark:text-white mb-2">No posts yet</p>
-                <p className="text-slate-500 dark:text-zinc-500 text-sm max-w-xs mx-auto">Be the first to share your mindful journey!</p>
+                <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-4 text-3xl">🌿</div>
+                <p className="text-xl font-bold text-slate-700 mb-2">No posts yet</p>
+                <p className="text-slate-500 text-sm max-w-xs mx-auto">Be the first to share your mindful journey!</p>
               </div>
             ) : (
               posts.map((item: any, index) => {
@@ -713,39 +653,35 @@ export default function HomeFeedScreen() {
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: index * 0.1 }}
-                      className="border-b border-slate-300 p-4 hover:bg-slate-200/5 transition"
+                      className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 group"
                     >
-                      <div className="flex gap-3">
-                        <div className="flex-shrink-0">
-                          <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold border border-black">
-                            {item.author_name?.[0] || "U"}
-                          </div>
+                      <div className="p-4 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-bold text-xs uppercase">
+                          {item.author_name?.[0] || "U"}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-bold text-white text-[15px]">{item.author_name}</span>
-                            <span className="text-slate-500 text-[14px]">@{item.author_name?.replace(/\s+/g, '').toLowerCase() || 'user'}</span>
-                            <span className="text-slate-500 text-[14px]">·</span>
-                            <span className="text-slate-500 text-[14px]">{new Date(item.created_at).toLocaleDateString()}</span>
-                          </div>
-
-                          <div className="aspect-[9/16] max-h-[600px] w-full bg-black shadow-inner">
-                            <VideoPlayer
-                              src={item.video_url?.startsWith("/static") ? `${API_BASE}${item.video_url}` : (item.video_url || "")}
-                              className="h-full"
-                            />
-                          </div>
-
-                          {item.content && (
-                            <div className="p-4 pt-3">
-                              <p className="text-slate-700 dark:text-zinc-300 text-sm leading-relaxed">
-                                <span className="font-bold mr-2 text-slate-900 dark:text-white">{item.author_name}</span>
-                                {item.content}
-                              </p>
-                            </div>
-                          )}
+                        <div>
+                          <p className="font-bold text-slate-800 text-sm">{item.author_name}</p>
+                          <p className="text-[10px] text-slate-400 font-medium">
+                            {new Date(item.created_at).toLocaleDateString()}
+                          </p>
                         </div>
                       </div>
+
+                      <div className="aspect-[9/16] max-h-[600px] w-full bg-black shadow-inner">
+                        <VideoPlayer
+                          src={item.video_url?.startsWith("/static") ? `${API_BASE}${item.video_url}` : (item.video_url || "")}
+                          className="h-full"
+                        />
+                      </div>
+
+                      {item.content && (
+                        <div className="p-4 pt-3">
+                          <p className="text-slate-700 text-sm leading-relaxed">
+                            <span className="font-bold mr-2 text-slate-900">{item.author_name}</span>
+                            {item.content}
+                          </p>
+                        </div>
+                      )}
                     </motion.div>
                   );
                 }
@@ -756,58 +692,43 @@ export default function HomeFeedScreen() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className="border-b border-slate-300 p-4 hover:bg-slate-200/5 transition cursor-pointer"
+                    className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 flex flex-col group transition-all duration-300 hover:shadow-md"
                   >
-                    <div className="flex gap-3">
-                      <div className="flex-shrink-0">
-                        <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white font-bold border border-black overflow-hidden">
+                    <div className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 font-bold border border-emerald-100 overflow-hidden">
                           {item.author_profile_pic ? (
                             <img src={item.author_profile_pic} alt="" className="w-full h-full object-cover" />
                           ) : (
                             item.author_name?.[0]?.toUpperCase() || "U"
                           )}
                         </div>
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white text-[15px] hover:underline decoration-1">{item.author_name}</span>
-                          <span className="text-slate-500 text-[14px]">@{item.author_name?.replace(/\s+/g, '').toLowerCase() || 'user'}</span>
-                          <span className="text-slate-500 text-[14px]">·</span>
-                          <span className="text-slate-500 text-[14px]">{new Date(item.created_at).toLocaleDateString()}</span>
+                        <div>
+                          <p className="font-bold text-slate-800 text-sm leading-tight">{item.author_name}</p>
+                          <p className="text-[10px] text-slate-400 font-medium">
+                            {new Date(item.created_at).toLocaleDateString()}
+                          </p>
                         </div>
-
-                        {item.content && (
-                          <div className="mb-3">
-                            <p className="text-white text-[15px] leading-normal whitespace-pre-line">{item.content}</p>
-                          </div>
-                        )}
-
-                        {item.image_url && (
-                          <div className="mt-3">
-                            <div className="rounded-2xl overflow-hidden border border-slate-300">
-                              <img
-                                src={item.image_url.startsWith("http") ? item.image_url : (item.image_url.startsWith("/static") ? `${API_BASE}${item.image_url}` : item.image_url)}
-                                alt="Post content"
-                                className="w-full h-full object-cover max-h-[500px]"
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Action Bar (Mock) */}
-                        <div className="flex items-center justify-between mt-3 max-w-md">
-                          <button className="flex items-center gap-2 group text-slate-500 hover:text-primary-500 transition-colors">
-                            <div className="p-2 rounded-full group-hover:bg-primary-500/10 transition-colors">
-                              <MessageCircle className="w-4 h-4" />
-                            </div>
-                            <span className="text-xs">0</span>
-                          </button>
-                          {/* Add more icons if needed */}
-                        </div>
-
                       </div>
                     </div>
+
+                    {item.image_url && (
+                      <div className="px-4 pb-4">
+                        <div className="aspect-square rounded-2xl overflow-hidden bg-slate-100 border border-slate-50">
+                          <img
+                            src={item.image_url.startsWith("http") ? item.image_url : (item.image_url.startsWith("/static") ? `${API_BASE}${item.image_url}` : item.image_url)}
+                            alt="Post content"
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {item.content && (
+                      <div className="p-4 pt-0">
+                        <p className="text-slate-700 text-[15px] leading-relaxed whitespace-pre-line">{item.content}</p>
+                      </div>
+                    )}
                   </motion.div>
                 );
               })
@@ -833,13 +754,12 @@ export default function HomeFeedScreen() {
               initial={{ y: 100, scale: 0.9 }}
               animate={{ y: 0, scale: 1 }}
               exit={{ y: 100, scale: 0.9 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="bg-white dark:bg-zinc-900 w-full max-w-lg rounded-t-[32px] sm:rounded-3xl shadow-2xl overflow-hidden"
+              className="bg-white w-full max-w-lg rounded-t-[32px] sm:rounded-3xl shadow-2xl overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-slate-800 dark:text-white">New Reflection</h2>
+                  <h2 className="text-xl font-bold text-slate-800">New Reflection</h2>
                   <button
                     onClick={() => setShowNewPost(false)}
                     className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
@@ -849,7 +769,7 @@ export default function HomeFeedScreen() {
                 </div>
 
                 <textarea
-                  className="w-full h-40 p-4 bg-slate-50 dark:bg-zinc-800 rounded-2xl border-2 border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-black transition-all duration-300 resize-none outline-none text-slate-700 dark:text-white font-medium placeholder:text-slate-400"
+                  className="w-full h-40 p-4 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-emerald-500 focus:bg-white transition-all duration-300 resize-none outline-none text-slate-700 font-medium placeholder:text-slate-400"
                   placeholder="What's on your mind today?"
                   value={postContent}
                   onChange={(e) => setPostContent(e.target.value)}
