@@ -317,11 +317,6 @@ export default function HomeFeedScreen() {
           status: 'pending',
           progress: 30
         });
-
-        setSubmissionFeedback({
-          type: 'success',
-          message: 'Video submitted for admin review'
-        });
       } else {
         // IMAGE/POST UPLOAD FLOW
         let imageUrl = null;
