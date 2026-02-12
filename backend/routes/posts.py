@@ -111,7 +111,7 @@ def get_post_status(post_id: str):
     
     # Check pending collection
     pending_post = db.pending_posts.find_one({"_id": ObjectId(post_id)})
-    if pending_post:
-        return {"status": pending_post.get("status", "pending"), "rejection_reason": pending_post.get("rejection_reason")}
+    if (pending_post):
+        return {"status": pending_post.get("status", "pending").lower(), "rejection_reason": pending_post.get("rejection_reason")}
     
     raise HTTPException(status_code=404, detail="Post not found")

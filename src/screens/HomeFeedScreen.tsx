@@ -214,12 +214,14 @@ export default function HomeFeedScreen() {
         const res = await fetch(endpoint);
         if (res.ok) {
           const data = await res.json();
-          if (data.status === 'approved') {
+          const currentStatus = data.status?.toLowerCase();
+
+          if (currentStatus === 'approved') {
             setPendingItem(null); // Clear progress bar immediately
             setSubmissionFeedback({ type: 'success', message: 'Successfully posted' });
             fetchData(); // Refresh feed
             setTimeout(() => setSubmissionFeedback(null), 5000);
-          } else if (data.status === 'rejected') {
+          } else if (currentStatus === 'rejected') {
             setPendingItem(null); // Clear progress bar immediately
             setSubmissionFeedback({ type: 'error', message: 'Unable to post because this is against our community guidelines' });
             setTimeout(() => setSubmissionFeedback(null), 5000);
@@ -459,12 +461,15 @@ export default function HomeFeedScreen() {
         <AnimatePresence>
           {submissionFeedback && (
             <motion.div
-              initial={{ y: -50, opacity: 0 }}
+              key="submission-feedback-popup"
+              initial={{ y: -100, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -50, opacity: 0 }}
-              className="fixed top-24 left-4 right-4 z-50 pointer-events-none"
+              exit={{ y: -100, opacity: 0 }}
+              className="fixed top-28 left-4 right-4 z-[9999] pointer-events-none"
             >
-              <div className={`mx-auto max-w-md p-4 rounded-2xl shadow-2xl border flex items-center gap-3 backdrop-blur-md ${submissionFeedback.type === 'success' ? 'bg-emerald-500/90 border-emerald-400 text-white' : 'bg-rose-500/90 border-rose-400 text-white'
+              <div className={`mx-auto max-w-md p-5 rounded-2xl shadow-2xl border-2 flex items-center gap-4 backdrop-blur-xl ${submissionFeedback.type === 'success'
+                ? 'bg-emerald-600 border-emerald-400 text-white'
+                : 'bg-rose-600 border-rose-400 text-white'
                 }`}>
                 {submissionFeedback.type === 'success' ? (
                   <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
