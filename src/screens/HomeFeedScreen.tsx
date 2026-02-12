@@ -628,7 +628,7 @@ export default function HomeFeedScreen() {
                     setSearchQuery(e.target.value);
                     if (e.target.value.trim().length > 2) {
                       setSearchingUsers(true);
-                      fetch(`${API_BASE}/friends/search?query=${e.target.value}`)
+                      fetch(`${API_BASE}/friends/search?query=${e.target.value}&current_user_id=${user?.id || ""}`)
                         .then(r => r.json())
                         .then(d => {
                           setSearchResults(d);

@@ -8,29 +8,26 @@ from datetime import datetime
 router = APIRouter(prefix="/friends", tags=["friends"])
 
 @router.get("/search", response_model=List[UserResponse])
-def search_users(query: str, current_user_id: str):
+def search_users(query: str, current_user_id: str = None):
     db = get_db()
     if db is None:
          raise HTTPException(status_code=503, detail="Database not available")
     
     try:
-        user_oid = ObjectId(current_user_id)
+        user_oid = ObjectId(current_user_id) if current_user_id else None
     except:
         user_oid = None
 
     query_filter = {
-        "$and": [
-            {"is_verified": True},
-            {
-                "$or": [
-                    {"full_name": {"$regex": query, "$options": "i"}},
-                    {"email": {"$regex": query, "$options": "i"}}
-                ]
-            }
+        "$or": [
+            {"full_name": {"$regex": query, "$options": "i"}},
+            {"email": {"$regex": query, "$options": "i"}}
         ]
     }
     
     if user_oid:
+        if "$and" not in query_filter:
+            query_filter = {"$and": [query_filter]}
         query_filter["$and"].append({"_id": {"$ne": user_oid}})
     
     users_cursor = db.users.find(query_filter).limit(20)
