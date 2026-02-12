@@ -186,7 +186,8 @@ export default function ProfileScreen() {
       const res = await fetch(`${API_BASE}/posts/my?user_id=${targetUserId}`);
       if (res.ok) {
         const data = await res.json();
-        setMyPosts(data);
+        // Filter out rejected posts
+        setMyPosts(Array.isArray(data) ? data.filter((p: any) => p.status !== 'rejected') : []);
       }
     } catch (error) {
       console.error("Failed to fetch posts", error);
@@ -202,7 +203,8 @@ export default function ProfileScreen() {
       const res = await fetch(`${API_BASE}/videos/user/${targetUserId}`);
       if (res.ok) {
         const data = await res.json();
-        setMyVideos(data);
+        // Filter out rejected videos
+        setMyVideos(Array.isArray(data) ? data.filter((v: any) => v.status !== 'rejected') : []);
       }
     } catch (error) {
       console.error("Failed to fetch videos", error);

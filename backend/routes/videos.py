@@ -156,3 +156,14 @@ def delete_video(video_id: str, user_id: str):
         raise HTTPException(status_code=404, detail="Video not found or unauthorized")
     
     return {"message": "Video deleted"}
+@router.get("/{video_id}/status")
+def get_video_status(video_id: str):
+    from database import get_client
+    client = get_client()
+    db = client["MindRiseDB"]
+    
+    video = db.user_videos.find_one({"_id": ObjectId(video_id)})
+    if video:
+        return {"status": video.get("status", "pending").lower(), "rejection_reason": video.get("rejection_reason")}
+    
+    raise HTTPException(status_code=404, detail="Video not found")

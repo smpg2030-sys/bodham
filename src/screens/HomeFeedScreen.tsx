@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, Plus, Bell, Image as ImageIcon, Video as VideoIcon, Camera, ArrowLeft } from "lucide-react";
+import { Search, Plus, Bell, Image as ImageIcon, Video as VideoIcon, Camera, ArrowLeft, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Post, FriendRequest, AppNotification, CommunityStory } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -29,6 +29,7 @@ export default function HomeFeedScreen() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isVideo, setIsVideo] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [pendingItem, setPendingItem] = useState<{ id: string, type: 'post' | 'video', status: 'pending' | 'approved' | 'rejected', progress: number, error?: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchingUsers, setSearchingUsers] = useState(false);
@@ -199,6 +200,40 @@ export default function HomeFeedScreen() {
     }
   }, [user]);
 
+  // Status Polling for Pending Post/Video
+  useEffect(() => {
+    if (!pendingItem || pendingItem.status !== 'pending') return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const endpoint = pendingItem.type === 'video'
+          ? `${API_BASE}/videos/${pendingItem.id}/status`
+          : `${API_BASE}/posts/${pendingItem.id}/status`;
+
+        const res = await fetch(endpoint);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'approved') {
+            setPendingItem(prev => prev ? { ...prev, status: 'approved', progress: 100 } : null);
+            fetchData(); // Refresh feed to show the new post
+            // Auto-clear after 3 seconds
+            setTimeout(() => setPendingItem(null), 3000);
+          } else if (data.status === 'rejected') {
+            setPendingItem(prev => prev ? { ...prev, status: 'rejected', progress: 100, error: "This post is against our community guidelines" } : null);
+            // Don't auto-clear, let the user see the error
+          } else {
+            // Still pending, increment progress slightly for visual feedback if < 90
+            setPendingItem(prev => prev ? { ...prev, progress: Math.min(prev.progress + 2, 90) } : null);
+          }
+        }
+      } catch (err) {
+        console.error("Status polling failed", err);
+      }
+    }, 3000);
+
+    return () => clearInterval(pollInterval);
+  }, [pendingItem]);
+
   const handlePostSubmit = async () => {
     if (!postContent.trim() && !selectedFile) return;
     setIsUploading(true);
@@ -248,7 +283,13 @@ export default function HomeFeedScreen() {
 
         if (!regRes.ok) throw new Error("Failed to register video metadata");
 
-        alert("Video uploaded and sent for review! ✅");
+        const regData = await regRes.json();
+        setPendingItem({
+          id: regData.videoId || regData.id,
+          type: 'video',
+          status: 'pending',
+          progress: 10
+        });
       } else {
         // IMAGE/POST UPLOAD FLOW
         let imageUrl = null;
@@ -276,7 +317,13 @@ export default function HomeFeedScreen() {
         });
 
         if (!response.ok) throw new Error("Failed to submit post");
-        alert("Reflection shared for review! ✅");
+        const postData = await response.json();
+        setPendingItem({
+          id: postData.id,
+          type: 'post',
+          status: 'pending',
+          progress: 10
+        });
       }
 
       // Reset
@@ -394,6 +441,68 @@ export default function HomeFeedScreen() {
           )}
         </AnimatePresence>
 
+        {/* Pending Status Bar */}
+        <AnimatePresence mode="wait">
+          {pendingItem && (
+            <motion.div
+              key="pending-status"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className={`p-4 rounded-3xl border shadow-sm flex flex-col gap-3 ${pendingItem.status === 'rejected' ? 'bg-red-50 border-red-100' :
+                  pendingItem.status === 'approved' ? 'bg-emerald-50 border-emerald-100' :
+                    'bg-white border-slate-100'
+                }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {pendingItem.status === 'pending' ? (
+                      <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
+                    ) : pendingItem.status === 'approved' ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    ) : (
+                      <AlertCircle className="w-5 h-5 text-red-500" />
+                    )}
+                    <span className={`font-bold text-sm ${pendingItem.status === 'rejected' ? 'text-red-700' :
+                        pendingItem.status === 'approved' ? 'text-emerald-700' :
+                          'text-slate-700'
+                      }`}>
+                      {pendingItem.status === 'pending' ? 'Reviewing your reflection...' :
+                        pendingItem.status === 'approved' ? 'Reflection Approved!' :
+                          'Reflection Rejected'}
+                    </span>
+                  </div>
+                  {pendingItem.status === 'rejected' && (
+                    <button
+                      onClick={() => setPendingItem(null)}
+                      className="text-xs font-bold text-red-500 hover:text-red-600"
+                    >
+                      Dismiss
+                    </button>
+                  )}
+                </div>
+
+                <div className="relative h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pendingItem.progress}%` }}
+                    className={`absolute top-0 left-0 h-full rounded-full transition-all duration-500 shadow-sm ${pendingItem.status === 'rejected' ? 'bg-red-500' :
+                        pendingItem.status === 'approved' ? 'bg-emerald-500' :
+                          'bg-slate-900'
+                      }`}
+                  />
+                </div>
+
+                {pendingItem.error && (
+                  <p className="text-xs font-medium text-red-600 animate-pulse">
+                    {pendingItem.error}
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12 space-y-4">
             <div className="w-8 h-8 border-4 border-emerald-100 border-t-emerald-500 rounded-full animate-spin"></div>
