@@ -521,6 +521,11 @@ export default function HomeFeedScreen() {
                       Reviewing your reflection...
                     </span>
                   </div>
+                  {pendingItem.type === 'video' && (
+                    <div className="w-12 h-12 rounded-lg bg-slate-900 flex items-center justify-center text-white">
+                      <VideoIcon className="w-5 h-5 animate-pulse" />
+                    </div>
+                  )}
                 </div>
 
                 <div className="relative h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
@@ -629,11 +634,11 @@ export default function HomeFeedScreen() {
                         />
                       </div>
 
-                      {item.caption && (
+                      {item.content && (
                         <div className="p-4 pt-3">
                           <p className="text-slate-700 text-sm leading-relaxed">
                             <span className="font-bold mr-2 text-slate-900">{item.author_name}</span>
-                            {item.caption}
+                            {item.content}
                           </p>
                         </div>
                       )}
@@ -679,9 +684,11 @@ export default function HomeFeedScreen() {
                       </div>
                     )}
 
-                    <div className="p-4 pt-0">
-                      <p className="text-slate-700 text-[15px] leading-relaxed whitespace-pre-line">{item.content}</p>
-                    </div>
+                    {item.content && (
+                      <div className="p-4 pt-0">
+                        <p className="text-slate-700 text-[15px] leading-relaxed whitespace-pre-line">{item.content}</p>
+                      </div>
+                    )}
                   </motion.div>
                 );
               })

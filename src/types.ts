@@ -17,6 +17,7 @@ export interface Post {
     author_email?: string;
     content: string;
     image_url?: string;
+    video_url?: string;
     status: "pending" | "approved" | "rejected";
     created_at: string;
     rejection_reason?: string;

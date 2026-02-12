@@ -313,15 +313,26 @@ export default function AdminPanelScreen() {
                     {post.status}
                   </span>
                 </div>
-                <p className="text-slate-800 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                  {post.content}
-                </p>
+                {post.content && (
+                  <p className="text-slate-800 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">
+                    {post.content}
+                  </p>
+                )}
                 {post.image_url && (
                   <div className="mt-3 bg-slate-900/5 rounded-xl overflow-hidden flex items-center justify-center">
                     <img
                       src={post.image_url.startsWith("/static") ? `${API_BASE}${post.image_url}` : post.image_url}
                       alt="Post content"
                       className="w-full h-auto max-h-[400px] object-contain"
+                    />
+                  </div>
+                )}
+
+                {post.video_url && (
+                  <div className="mt-3 bg-black rounded-xl overflow-hidden aspect-[9/16] max-h-[500px] relative border border-slate-100 shadow-inner group">
+                    <VideoPlayer
+                      src={post.video_url.startsWith("/static") ? `${API_BASE}${post.video_url}` : post.video_url}
+                      className="w-full h-full"
                     />
                   </div>
                 )}
