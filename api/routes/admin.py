@@ -3,6 +3,7 @@ from typing import List
 from bson import ObjectId
 from pydantic import BaseModel
 from database import get_db, get_client
+from config import DB_NAME
 from models import UserResponse, PostResponse, VideoResponse
 from datetime import datetime
 
@@ -53,7 +54,7 @@ def get_stats(role: str):
     
     # Count pending videos from MindRiseDB
     client = get_client()
-    db_videos = client["MindRiseDB"]
+    db_videos = client[DB_NAME]
     pending_videos = db_videos.user_videos.count_documents({"status": {"$in": ["pending", "Pending"]}})
     
     return {
@@ -117,7 +118,7 @@ def get_videos(role: str, status: str = "all"):
     
     db_mindrise = get_db()  # Use canonical DB for users
     client = get_client()
-    db_videos = client["MindRiseDB"]
+    db_videos = client[DB_NAME]
     
     query = {}
     if status == "approved":
@@ -163,7 +164,7 @@ def update_video_status(video_id: str, update: PostStatusUpdate, role: str):
     if role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     client = get_client()
-    db = client["MindRiseDB"]
+    db = client[DB_NAME]
     db_status = update.status.lower() 
     result = db.user_videos.update_one(
         {"_id": ObjectId(video_id)},
@@ -188,7 +189,7 @@ def approve_video_standard(payload: dict, role: str = "admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     client = get_client()
-    db = client["MindRiseDB"]
+    db = client[DB_NAME]
     
     result = db.user_videos.update_one(
         {"_id": ObjectId(video_id)},

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from database import get_db
 from models import VideoCreate, VideoResponse
+from config import DB_NAME
 from bson import ObjectId
 from datetime import datetime
 
@@ -14,7 +15,7 @@ def get_all_videos():
         raise HTTPException(status_code=503, detail="Database connection not established")
     
     db_mindrise = get_db() # Canonical DB for users
-    db_videos = client["MindRiseDB"]
+    db_videos = client[DB_NAME]
     
     # Fetch approved videos sorted by created_at descending
     videos_cursor = db_videos.user_videos.find({"status": "approved"}).sort("created_at", -1)
@@ -57,7 +58,7 @@ def get_all_videos():
 def create_video(video: VideoCreate):
     from database import get_client
     client = get_client()
-    db = client["MindRiseDB"]
+    db = client[DB_NAME]
     
     doc = {
         "user_id": video.user_id,
@@ -78,7 +79,7 @@ def get_my_videos(user_id: str):
     from database import get_client
     client = get_client()
     db_mindrise = get_db()
-    db_videos = client["MindRiseDB"]
+    db_videos = client[DB_NAME]
     
     # Return all videos for the user from the single collection
     videos_cursor = db_videos.user_videos.find({"user_id": user_id}).sort("created_at", -1)
@@ -114,7 +115,7 @@ def get_user_videos(user_id: str):
     from database import get_client
     client = get_client()
     db_mindrise = get_db()
-    db_videos = client["MindRiseDB"]
+    db_videos = client[DB_NAME]
     
     # Return only approved videos for the profile view
     videos_cursor = db_videos.user_videos.find({
@@ -148,7 +149,7 @@ def get_user_videos(user_id: str):
 def delete_video(video_id: str, user_id: str):
     from database import get_client
     client = get_client()
-    db = client["MindRiseDB"]
+    db = client[DB_NAME]
     
     result = db.user_videos.delete_one({"_id": ObjectId(video_id), "user_id": user_id})
     
@@ -156,3 +157,15 @@ def delete_video(video_id: str, user_id: str):
         raise HTTPException(status_code=404, detail="Video not found or unauthorized")
     
     return {"message": "Video deleted"}
+
+@router.get("/{video_id}/status")
+def get_video_status(video_id: str):
+    from database import get_client
+    client = get_client()
+    db = client[DB_NAME]
+    
+    video = db.user_videos.find_one({"_id": ObjectId(video_id)})
+    if video:
+        return {"status": video.get("status", "pending").lower(), "rejection_reason": video.get("rejection_reason")}
+    
+    raise HTTPException(status_code=404, detail="Video not found")

@@ -2,7 +2,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 import os
 import cloudinary
 import cloudinary.uploader
-from config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+from config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, DB_NAME
 from database import get_client
 from datetime import datetime
 
@@ -24,6 +24,7 @@ def configure_cloudinary():
 configure_cloudinary()
 
 @router.get("/upload/signature")
+@router.get("/upload-video/signature")  # Legacy support
 def get_upload_signature(folder: str = "MindRise_Videos"):
     if not CLOUDINARY_API_SECRET:
         raise HTTPException(status_code=500, detail="Cloudinary credentials not configured.")
@@ -59,7 +60,7 @@ async def register_video(payload: dict):
         raise HTTPException(status_code=400, detail="Missing video_url or user_id")
     
     client = get_client()
-    db = client["MindRiseDB"]
+    db = client[DB_NAME]
     collection = db["user_videos"]
     
     record = {
@@ -111,7 +112,7 @@ async def upload_video(
         
         # 2. Store in MindRiseDB.user_videos
         client = get_client()
-        db = client["MindRiseDB"]
+        db = client[DB_NAME]
         collection = db["user_videos"]
         
         record = {

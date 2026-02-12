@@ -67,7 +67,7 @@ def get_my_posts(user_id: str):
     
     # Return all posts for the user from both collections
     approved_posts = list(db.posts.find({"user_id": user_id}))
-    pending_posts = list(db.pending_posts.find({"user_id": user_id}))
+    pending_posts = list(db.pending_posts.find({"user_id": user_id, "status": {"$ne": "rejected"}}))
     
     # Fetch user for profile pic
     user = db.users.find_one({"_id": ObjectId(user_id)})
@@ -98,3 +98,21 @@ def delete_post(post_id: str, user_id: str):
         raise HTTPException(status_code=404, detail="Post not found or unauthorized")
     
     return {"message": "Post deleted"}
+
+@router.get("/{post_id}/status")
+def get_post_status(post_id: str):
+    db = get_db()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database connection not established")
+    
+    # Check approved collection first
+    post = db.posts.find_one({"_id": ObjectId(post_id)})
+    if post:
+        return {"status": "approved"}
+    
+    # Check pending collection
+    pending_post = db.pending_posts.find_one({"_id": ObjectId(post_id)})
+    if (pending_post):
+        return {"status": pending_post.get("status", "pending").lower(), "rejection_reason": pending_post.get("rejection_reason")}
+    
+    raise HTTPException(status_code=404, detail="Post not found")
