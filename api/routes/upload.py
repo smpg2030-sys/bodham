@@ -23,8 +23,8 @@ def configure_cloudinary():
 # Initial config attempt
 configure_cloudinary()
 
-@router.get("/upload-video/signature")
-def get_upload_signature():
+@router.get("/upload/signature")
+def get_upload_signature(folder: str = "MindRise_Videos"):
     if not CLOUDINARY_API_SECRET:
         raise HTTPException(status_code=500, detail="Cloudinary credentials not configured.")
     
@@ -34,7 +34,7 @@ def get_upload_signature():
     # Standard params for MindRise uploads
     params = {
         "timestamp": timestamp,
-        "folder": "MindRise_Videos",
+        "folder": folder,
     }
     
     # Generate signature using the Cloudinary helper
@@ -45,7 +45,7 @@ def get_upload_signature():
         "timestamp": timestamp,
         "api_key": CLOUDINARY_API_KEY,
         "cloud_name": CLOUDINARY_CLOUD_NAME,
-        "folder": "MindRise_Videos"
+        "folder": folder
     }
 
 @router.post("/upload-video/register")

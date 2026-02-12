@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { LogOut, Settings, Shield, Trash2, MoreVertical, Grid, Bookmark, Camera, Video as VideoIcon, Upload, Users, UserPlus, CheckCircle2, Clock } from "lucide-react";
-import { Post, Video, AppFriend, User } from "../types";
+import { Post, Video, AppFriend, User, JournalEntry } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
 import VideoPlayer from "../components/VideoPlayer";
 import GrowthTree from "../components/GrowthTree";
@@ -43,6 +43,7 @@ export default function ProfileScreen() {
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [isSavingDetails, setIsSavingDetails] = useState(false);
+  const [calculatedStreak, setCalculatedStreak] = useState<number>(0);
 
   useEffect(() => {
     if (isOwnProfile && currentUser) {
@@ -81,9 +82,64 @@ export default function ProfileScreen() {
       fetchMyPosts();
       fetchMyVideos();
       fetchFriends();
+      fetchStreakData();
       if (!isOwnProfile) checkFriendship();
     }
   }, [targetUserId, isOwnProfile]);
+
+  const fetchStreakData = async () => {
+    if (!targetUserId) return;
+    try {
+      const res = await fetch(`${API_BASE}/journals/?user_id=${targetUserId}`);
+      if (res.ok) {
+        const entries: JournalEntry[] = await res.json();
+        const streak = calculateStreakFromJournals(entries);
+        setCalculatedStreak(streak);
+      }
+    } catch (err) {
+      console.error("Error fetching streak data", err);
+    }
+  };
+
+  const calculateStreakFromJournals = (entries: JournalEntry[]) => {
+    if (!entries || entries.length === 0) return 0;
+
+    // Get unique dates in YYYY-MM-DD format
+    const dates = new Set(entries.map(e => {
+      try {
+        return new Date(e.date).toISOString().split('T')[0];
+      } catch (e) {
+        return null;
+      }
+    }).filter(d => d !== null) as string[]);
+
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+    let streak = 0;
+    let currentCheckDate = "";
+
+    // If they journaled today, start from today. 
+    // If not, but they journaled yesterday, start from yesterday (streak still active).
+    // Otherwise, streak is 0.
+    if (dates.has(today)) {
+      currentCheckDate = today;
+    } else if (dates.has(yesterday)) {
+      currentCheckDate = yesterday;
+    } else {
+      return 0;
+    }
+
+    // Move backward day by day
+    while (dates.has(currentCheckDate)) {
+      streak++;
+      const dateObj = new Date(currentCheckDate);
+      dateObj.setDate(dateObj.getDate() - 1);
+      currentCheckDate = dateObj.toISOString().split('T')[0];
+    }
+
+    return streak;
+  };
 
   const checkFriendship = async () => {
     if (!currentUser || !userId) return;
@@ -211,7 +267,7 @@ export default function ProfileScreen() {
 
         // 1. Get Signature from Backend
         console.log("Fetching upload signature from backend...");
-        const sigRes = await fetch(`${API_BASE}/upload-video/signature`);
+        const sigRes = await fetch(`${API_BASE}/upload/signature?folder=MindRise_Videos`);
         if (!sigRes.ok) throw new Error("Could not get upload signature (Backend error)");
         const { signature, timestamp, api_key, cloud_name, folder } = await sigRes.json();
         console.log("Signature received:", { api_key, cloud_name, folder });
@@ -304,28 +360,50 @@ export default function ProfileScreen() {
     if (e.target.files && e.target.files[0] && currentUser) {
       const file = e.target.files[0];
       try {
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(file);
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = error => reject(error);
+        // 1. Get Signature from Backend for ProfilePics
+        const sigRes = await fetch(`${API_BASE}/upload/signature?folder=MindRise_ProfilePics`);
+        if (!sigRes.ok) throw new Error("Could not get upload signature");
+        const { signature, timestamp, api_key, cloud_name, folder } = await sigRes.json();
+
+        // 2. Upload directly to Cloudinary
+        const cloudFormData = new FormData();
+        cloudFormData.append("file", file);
+        cloudFormData.append("api_key", api_key);
+        cloudFormData.append("timestamp", timestamp.toString());
+        cloudFormData.append("signature", signature);
+        cloudFormData.append("folder", folder);
+
+        const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${cloud_name}/image/upload`;
+        const cloudRes = await fetch(cloudinaryUrl, {
+          method: "POST",
+          body: cloudFormData,
         });
 
+        if (!cloudRes.ok) {
+          const cloudErr = await cloudRes.json();
+          throw new Error(cloudErr.error?.message || "Cloudinary upload failed");
+        }
+
+        const cloudData = await cloudRes.json();
+        const profilePicUrl = cloudData.secure_url;
+
+        // 3. Save the URL to our backend
         const res = await fetch(`${API_BASE}/auth/user/${currentUser.id}/profile-pic`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ profile_pic: base64 }),
+          body: JSON.stringify({ profile_pic: profilePicUrl }),
         });
 
         if (res.ok) {
           const updatedUser = await res.json();
           setCurrentUser(updatedUser);
+          alert("Profile picture updated! ✅");
         } else {
-          alert("Failed to upload profile picture");
+          alert("Failed to save profile picture URL to backend");
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Profile pic upload error", error);
-        alert("Error uploading profile picture");
+        alert(`Error uploading profile picture: ${error.message}`);
       }
     }
   };
@@ -563,7 +641,10 @@ export default function ProfileScreen() {
         {/* MindRise Growth Tree Section */}
         {(isOwnProfile || friendshipStatus === "accepted") ? (
           <div className="mb-8">
-            <GrowthTree createdAt={targetUser.created_at} />
+            <GrowthTree
+              createdAt={targetUser.created_at}
+              manualStreak={calculatedStreak}
+            />
           </div>
         ) : (
           <div className="mb-8 p-8 bg-slate-50 rounded-3xl border border-slate-100 text-center">
@@ -588,14 +669,7 @@ export default function ProfileScreen() {
           </div>
           <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-4 rounded-2xl shadow-lg shadow-emerald-200 text-center text-white transform scale-105">
             <p className="text-2xl font-bold text-white">
-              {(isOwnProfile || friendshipStatus === "accepted") ? (() => {
-                if (!targetUser.created_at) return 0;
-                const created = new Date(targetUser.created_at);
-                const now = new Date();
-                const diffTime = Math.abs(now.getTime() - created.getTime());
-                const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                return Math.max(1, days);
-              })() : "—"}
+              {(isOwnProfile || friendshipStatus === "accepted") ? calculatedStreak : "—"}
             </p>
             <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-wider mt-1">Streak</p>
           </div>

@@ -25,7 +25,12 @@ class SMSService:
                 print(f"SMS sent via Twilio to {mobile}: {message.sid}")
                 return True
             except Exception as e:
-                print(f"Failed to send SMS via Twilio: {e}")
+                error_msg = str(e)
+                if "unverified" in error_msg.lower():
+                    print(f"Twilio Trial Account Restriction: {mobile} is unverified. Please verify this number in your Twilio Console.")
+                else:
+                    print(f"Failed to send SMS via Twilio: {e}")
+                
                 # Fallback to console
                 print(f"------------ FALLBACK SMS OTP for {mobile}: {otp} ------------")
                 return False

@@ -3,12 +3,14 @@ import { TreePine, Leaf, Flower2, Sparkles } from "lucide-react";
 
 interface GrowthTreeProps {
     createdAt?: string | null;
+    manualStreak?: number;
     variant?: "full" | "mini";
     onClick?: () => void;
 }
 
-export default function GrowthTree({ createdAt, variant = "full", onClick }: GrowthTreeProps) {
+export default function GrowthTree({ createdAt, manualStreak, variant = "full", onClick }: GrowthTreeProps) {
     const calculateDays = () => {
+        if (manualStreak !== undefined) return manualStreak;
         if (!createdAt) return 0;
         const created = new Date(createdAt);
         const now = new Date();

@@ -47,6 +47,56 @@ export default function HomeFeedScreen() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [communityStories, setCommunityStories] = useState<CommunityStory[]>([]);
   const [loading, setLoading] = useState(false);
+  const [calculatedStreak, setCalculatedStreak] = useState<number>(0);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchStreakData();
+    }
+  }, [user?.id]);
+
+  const fetchStreakData = async () => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(`${API_BASE}/journals/?user_id=${user.id}`);
+      if (res.ok) {
+        const entries: any[] = await res.json();
+        const streak = calculateStreakFromJournals(entries);
+        setCalculatedStreak(streak);
+      }
+    } catch (err) {
+      console.error("Error fetching streak data", err);
+    }
+  };
+
+  const calculateStreakFromJournals = (entries: any[]) => {
+    if (!entries || entries.length === 0) return 0;
+    const dates = new Set(entries.map(e => {
+      try {
+        return new Date(e.date).toISOString().split('T')[0];
+      } catch (e) {
+        return null;
+      }
+    }).filter(d => d !== null) as string[]);
+
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+    let streak = 0;
+    let currentCheckDate = "";
+
+    if (dates.has(today)) currentCheckDate = today;
+    else if (dates.has(yesterday)) currentCheckDate = yesterday;
+    else return 0;
+
+    while (dates.has(currentCheckDate)) {
+      streak++;
+      const dateObj = new Date(currentCheckDate);
+      dateObj.setDate(dateObj.getDate() - 1);
+      currentCheckDate = dateObj.toISOString().split('T')[0];
+    }
+    return streak;
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -207,6 +257,7 @@ export default function HomeFeedScreen() {
           <GrowthTree
             variant="mini"
             createdAt={user?.created_at}
+            manualStreak={calculatedStreak}
             onClick={() => navigate("/profile")}
           />
           <button
