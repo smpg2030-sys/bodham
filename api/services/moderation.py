@@ -1,68 +1,80 @@
-import random
-import re
+import google.generativeai as genai
+import json
+from config import GEMINI_API_KEY
+from datetime import datetime
+
+# Configure Gemini
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+else:
+    model = None
 
 def check_content(text: str, image_url: str | None = None, video_url: str | None = None) -> dict:
     """
-    Analyzes content and returns a moderation score and status.
-    Score ranges from 0.0 (Safe) to 1.0 (Unsafe).
-    
-    Thresholds:
-    - Score < 0.3: Approved
-    - 0.3 <= Score < 0.7: Flagged
-    - Score >= 0.7: Rejected
+    Analyzes content using Gemini AI.
+    Returns autonomous status (approved, rejected, flagged).
     """
     
-    score = 0.1 # Default safe score
-    details = []
-    
-    # 1. Text Analysis (Heuristics)
-    text_lower = text.lower()
-    category = "unclassified"
-    
-    # Positive/Safe categories (Bonus for safety)
-    positive_keywords = ["motivation", "inspire", "peace", "calm", "love", "community", "dance", "fun", "humor", "meditate"]
-    if any(word in text_lower for word in positive_keywords):
-        score -= 0.1 
-        details.append("Positive sentiment detected")
+    if not model:
+        # Fallback to safe flagging if API key is missing
+        return {
+            "score": 0.5,
+            "status": "flagged",
+            "category": "system_error",
+            "details": ["Gemini API Key missing: Defaulting to manual review"],
+            "language": "en",
+            "transcript": None
+        }
 
-    # Flagged keywords (Medium risk)
-    flagged_keywords = ["political", "controversial", "scam", "money", "invest", "crypto"]
-    if any(word in text_lower for word in flagged_keywords):
-        score += 0.4
-        category = "controversial"
-        details.append("Controversial keywords detected")
+    try:
+        # Construct Prompt
+        prompt = f"""
+        Analyze the following content for a community-driven mindfulness app (Mindrise).
+        Content Text: "{text}"
+        {'Image/Video URL: ' + (image_url or video_url) if (image_url or video_url) else ''}
         
-    # High risk / Banned keywords (High risk)
-    banned_keywords = ["hate", "violence", "kill", "attack", "abuse", "xxx", "nsfw", "naked", "sex", "porn"]
-    if any(word in text_lower for word in banned_keywords):
-        score += 0.8
-        category = "harmful_content"
-        details.append("Harmful content detected")
-
-    # 2. Media Analysis (Precautionary Flagging)
-    # Since we don't have a Vision AI integrated yet, we MUST flag all media for review.
-    if image_url or video_url:
-        if score < 0.5: # If not already rejected/flagged by text
-            score = 0.5
-            category = "media_review"
-            details.append("Media detected: Flagged for manual review (No Vision AI yet)")
-
-    # clamp score
-    score = max(0.0, min(1.0, score))
-    
-    # Determine Status
-    if score < 0.3:
-        status = "approved"
-    elif score < 0.7:
-        status = "flagged"
-    else:
-        status = "rejected"
+        Provide a safety assessment in JSON format with:
+        - status: "approved" (safe), "rejected" (unsafe/harmful), or "flagged" (ambiguous)
+        - score: 0.0 (Safe) to 1.0 (Unsafe)
+        - category: one word (e.g., hate, violence, sexual, spam, safe, controversial)
+        - reason: brief explanation
         
-    return {
-        "score": round(score, 2),
-        "status": status,
-        "category": category,
-        "details": details,
-        "language": "en", # Placeholder
-        "transcript": None # Placeholder for video transcript
-    }
+        Rules:
+        - Approve motivational, peaceful, and community-friendly content.
+        - Reject nudity, extreme violence, hate speech, or obvious scams.
+        - Flag if you are uncertain but it seems slightly controversial.
+        """
+
+        # For now, we only pass the text/metadata to Gemini Flash. 
+        # In a full-scale vision implementation, we'd pass the actual image bytes/files.
+        response = model.generate_content(prompt)
+        
+        # Clean response text as it might be wrapped in ```json
+        raw_text = response.text.strip()
+        if "```json" in raw_text:
+            raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw_text:
+            raw_text = raw_text.split("```")[1].split("```")[0].strip()
+            
+        result = json.loads(raw_text)
+        
+        return {
+            "score": float(result.get("score", 0.1)),
+            "status": result.get("status", "approved"),
+            "category": result.get("category", "unclassified"),
+            "details": [result.get("reason", "AI Assessed")],
+            "language": "en",
+            "transcript": None
+        }
+
+    except Exception as e:
+        print(f"Gemini Moderation Error: {e}")
+        return {
+            "score": 0.5,
+            "status": "flagged",
+            "category": "api_error",
+            "details": [f"Moderation failed: {str(e)}"],
+            "language": "en",
+            "transcript": None
+        }
