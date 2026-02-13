@@ -9,6 +9,7 @@ export interface User {
     mobile?: string | null;
     created_at?: string | null;
     last_active_at?: string | null;
+    streak_count?: number;
 }
 
 export interface Post {

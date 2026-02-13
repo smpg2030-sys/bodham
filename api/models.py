@@ -39,6 +39,8 @@ class UserResponse(BaseModel):
     bio: str | None = None
     created_at: str | None = None
     last_active_at: str | None = None
+    streak_count: int = 0
+    last_streak_date: str | None = None
 
 
 class OTPRequest(BaseModel):

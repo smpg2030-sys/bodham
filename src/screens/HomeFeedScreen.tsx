@@ -535,7 +535,8 @@ export default function HomeFeedScreen() {
           <GrowthTree
             variant="mini"
             createdAt={user?.created_at}
-            manualStreak={calculatedStreak}
+            // Use the streak count from the user profile (calculated by backend activity)
+            manualStreak={user?.streak_count || 1}
             onClick={() => navigate("/profile")}
           />
           <button
