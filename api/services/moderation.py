@@ -22,123 +22,87 @@ def is_obviously_harmful(text: str) -> bool:
     return any(re.search(p, text) for p in harmful_patterns)
 
 def check_with_sightengine(text: str, image_url: str | None = None, video_url: str | None = None) -> dict | None:
-    """Specialized moderation via Sightengine (High efficiency for media)."""
+    """Specialized moderation via Sightengine."""
     if not SIGHTENGINE_API_USER or not SIGHTENGINE_API_SECRET:
-        return None
+        return {"status": "error", "details": "Sightengine keys missing"}
 
     try:
-        # 1. Text Moderation
+        # 1. Text (Standard)
         if text:
-            text_params = {
-                'text': text,
-                'lang': 'en',
-                'mode': 'standard',
-                'api_user': SIGHTENGINE_API_USER,
-                'api_secret': SIGHTENGINE_API_SECRET
-            }
-            res = requests.post('https://api.sightengine.com/1.0/text/check.json', data=text_params, timeout=10)
+            res = requests.post('https://api.sightengine.com/1.0/text/check.json', data={
+                'text': text, 'lang': 'en', 'mode': 'standard',
+                'api_user': SIGHTENGINE_API_USER, 'api_secret': SIGHTENGINE_API_SECRET
+            }, timeout=8)
             if res.status_code == 200:
                 data = res.json()
-                if data.get('status') == 'success':
-                    profanity = data.get('profanity', {}).get('matches', [])
-                    if profanity:
-                        return {
-                            "score": 0.95,
-                            "status": "rejected",
-                            "category": "profanity",
-                            "details": [f"Harmful language detected: {', '.join([p['type'] for p in profanity])}"]
-                        }
+                if data.get('profanity', {}).get('matches'):
+                    return {"score": 1.0, "status": "rejected", "category": "profanity", "details": ["Direct profanity detected."]}
 
-        # 2. Image Moderation (Aggressive Detection)
+        # 2. Image (Aggressive)
         if image_url:
-            image_params = {
-                'models': 'nudity-2.0,wad,scam,suggestive,gore',
-                'url': image_url,
-                'api_user': SIGHTENGINE_API_USER,
-                'api_secret': SIGHTENGINE_API_SECRET
-            }
-            res = requests.get('https://api.sightengine.com/1.0/check.json', params=image_params, timeout=15)
+            res = requests.get('https://api.sightengine.com/1.0/check.json', params={
+                'models': 'nudity-2.0,wad,scam,suggestive,gore', 'url': image_url,
+                'api_user': SIGHTENGINE_API_USER, 'api_secret': SIGHTENGINE_API_SECRET
+            }, timeout=12)
             if res.status_code == 200:
                 data = res.json()
-                if data.get('status') == 'success':
-                    nudity = data.get('nudity', {})
-                    # Aggressive REJECT thresholds
-                    if (nudity.get('erotica', 0) > 0.1 or 
-                        nudity.get('sexual_display', 0) > 0.1 or 
-                        nudity.get('sexting', 0) > 0.1 or
-                        nudity.get('raw', 0) > 0.1 or
-                        nudity.get('partial', 0) > 0.2):
-                        return {"score": 1.0, "status": "rejected", "category": "nudity", "details": ["System detected prohibited visual content."]}
-                    
-                    # WAD and Gore
-                    wad = data.get('weapon', 0) + data.get('alcohol', 0) + data.get('drugs', 0)
-                    if wad > 0.5 or data.get('gore', {}).get('prob', 0) > 0.3:
-                        return {"score": 1.0, "status": "rejected", "category": "harmful_visuals", "details": ["Content violates community safety guidelines."]}
+                n = data.get('nudity', {})
+                # Extreme thresholds for Bodham
+                if (n.get('raw', 0) > 0.05 or n.get('partial', 0) > 0.1 or n.get('erotica', 0) > 0.1 or n.get('sexual_display', 0) > 0.1):
+                    return {"score": 1.0, "status": "rejected", "category": "nudity", "details": ["Visual violations detected."]}
+                
+                if (data.get('weapon', 0) > 0.3 or data.get('drugs', 0) > 0.3 or data.get('gore', {}).get('prob', 0) > 0.2):
+                    return {"score": 1.0, "status": "rejected", "category": "violence", "details": ["Harmful imagery detected."]}
 
-                    scam = data.get('scam', {}).get('prob', 0)
-                    if scam > 0.6:
-                        return {"score": 0.9, "status": "rejected", "category": "scam", "details": ["Scam pattern detected."]}
-                    
-                    # If Sightengine says it's clean (with high confidence), we can return approved
-                    # But for safety, we'll let it move to Gemini if image exists.
-                    # Or we could return:
-                    # return {"score": 0.1, "status": "approved", "category": "safe", "details": ["Sightengine safe image"]}
-
-        return None # Inconclusive, move to Gemini
+        return None # Proceed to Gemini
     except Exception as e:
-        print(f"Sightengine Error: {e}")
-        return {"status": "error", "details": f"Sightengine Fail: {str(e)}"}
+        return {"status": "error", "details": f"SE Error: {str(e)}"}
 
 def check_content(text: str, image_url: str | None = None, video_url: str | None = None) -> dict:
-    """Hybrid logic: Heuristics -> Sightengine -> Gemini."""
-    # 1. Heuristics
-    if is_obviously_harmful(text):
-        return {"score": 1.0, "status": "rejected", "category": "spam_profanity", "details": ["Heuristic filter detected harmful content."], "language": "en"}
-    if is_obviously_safe(text) and not image_url and not video_url:
-        return {"score": 0.0, "status": "approved", "category": "safe", "details": ["Heuristic filter detected safe content."], "language": "en"}
+    """Hybrid: Heuristics -> Sightengine -> Gemini."""
+    t = text.strip() if text else ""
+    if is_obviously_harmful(t):
+        return {"score": 1.0, "status": "rejected", "category": "harmful", "details": ["Local filter catch."], "language": "en"}
 
-    # 2. Sightengine
-    sight_result = check_with_sightengine(text, image_url, video_url)
-    if sight_result:
-        if sight_result.get("status") == "rejected":
-            return {**sight_result, "language": "en"}
-        if sight_result.get("status") == "approved":
-            return {**sight_result, "language": "en"}
-        # If error, keep record for Gemini fallback
-
-    # 3. Gemini Fallback
+    # Sightengine Pass
+    se = check_with_sightengine(t, image_url, video_url)
+    if se and se.get("status") == "rejected":
+        return {**se, "language": "en"}
+    
+    # Gemini Pass
     if not GEMINI_API_KEY:
-        error_msg = sight_result.get("details") if (sight_result and sight_result.get("status") == "error") else "Keys missing"
-        return {"score": 0.5, "status": "flagged", "category": "api_fail", "details": [f"Moderation unavailable: {error_msg}"], "language": "en"}
+        se_err = f" (SE: {se['details']})" if (se and se['status'] == 'error') else ""
+        return {"score": 0.5, "status": "flagged", "category": "api_fail", "details": [f"Missing Keys{se_err}"], "language": "en"}
 
     try:
-        # Simpler prompt to avoid safety blocks
-        prompt = f"Moderate text: '{text}'. Media: {image_url or video_url or 'None'}. Mindfulness app. Response JSON: {{'status':'approved'|'rejected', 'category':'...', 'reason':'...'}}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY.strip()}"
+        prompt = f"Moderate for mindfulness app. Text: '{t}'. Media: {image_url or 'None'}. Return JSON {{'status':'approved'|'rejected', 'reason':'...'}}"
         
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
-
         res = requests.post(url, json=payload, timeout=10)
+        
         if res.status_code != 200:
-            sight_error = f"(SE Error: {sight_result.get('details')})" if (sight_result and sight_result.get("status") == "error") else ""
-            return {"score": 0.5, "status": "flagged", "category": "api_fail", "details": [f"Gemini HTTP {res.status_code} {sight_error}"], "language": "en"}
+            return {"score": 0.5, "status": "flagged", "category": "api_fail", "details": [f"Gemini {res.status_code}: {res.text[:100]}"], "language": "en"}
 
         data = res.json()
         if 'candidates' not in data:
-            return {"score": 1.0, "status": "rejected", "category": "safety_block", "details": ["Inappropriate content blocked by provider."]}
+            return {"score": 1.0, "status": "rejected", "category": "safety_block", "details": ["Provider safety block."]}
 
-        raw_text = data['candidates'][0]['content']['parts'][0]['text'].strip()
-        if "```json" in raw_text: raw_text = raw_text.split("```json")[1].split("```")[0].strip()
-        elif "```" in raw_text: raw_text = raw_text.split("```")[1].split("```")[0].strip()
+        raw = data['candidates'][0]['content']['parts'][0]['text']
+        if "```" in raw: raw = raw.split("```")[1].replace("json", "").strip()
+        
+        result = json.loads(raw)
+        status = result.get("status", "flagged")
+        # Force decision if ambiguous but has bad vibe
+        if status == "flagged": status = "rejected" 
             
-        result = json.loads(raw_text)
         return {
-            "score": 0.9 if result.get("status") == "rejected" else 0.1,
-            "status": result.get("status", "flagged"),
-            "category": result.get("category", "unclassified"),
-            "details": [result.get("reason", "AI Decision")],
+            "score": 0.9 if status == "rejected" else 0.1,
+            "status": status,
+            "category": "ai_decision",
+            "details": [result.get("reason", "Analyzed")],
             "language": "en"
         }
     except Exception as e:
-        sight_error = f" (SE Error: {sight_result.get('details')})" if (sight_result and sight_result.get("status") == "error") else ""
-        return {"score": 0.5, "status": "flagged", "category": "ai_fail", "details": [f"Logic Error: {str(e)}{sight_error}"], "language": "en"}
+        se_msg = se.get("details") if (se and se['status'] == 'error') else "None"
+        return {"score": 0.5, "status": "flagged", "category": "api_fail", "details": [f"Failure: {str(e)} (SE: {se_msg})"], "language": "en"}
