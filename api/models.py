@@ -55,13 +55,6 @@ class PostCreate(BaseModel):
     video_url: str | None = None
 
 
-    user_id: str
-    title: str | None = None
-    content: str
-    date: str
-    created_at: str
-
-
 class CommentCreate(BaseModel):
     content: str
 
