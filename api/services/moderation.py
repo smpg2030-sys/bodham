@@ -1,22 +1,15 @@
-import google.generativeai as genai
+import requests
 import json
 from config import GEMINI_API_KEY
 from datetime import datetime
 
-# Configure Gemini
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-else:
-    model = None
-
 def check_content(text: str, image_url: str | None = None, video_url: str | None = None) -> dict:
     """
-    Analyzes content using Gemini AI.
+    Analyzes content using Gemini AI via REST API (Lighter than SDK).
     Returns autonomous status (approved, rejected, flagged).
     """
     
-    if not model:
+    if not GEMINI_API_KEY:
         # Fallback to safe flagging if API key is missing
         return {
             "score": 0.5,
@@ -28,7 +21,7 @@ def check_content(text: str, image_url: str | None = None, video_url: str | None
         }
 
     try:
-        # Construct Prompt
+        # Prompt for Gemini
         prompt = f"""
         Analyze the following content for a community-driven mindfulness app (Mindrise).
         Content Text: "{text}"
@@ -46,12 +39,28 @@ def check_content(text: str, image_url: str | None = None, video_url: str | None
         - Flag if you are uncertain but it seems slightly controversial.
         """
 
-        # For now, we only pass the text/metadata to Gemini Flash. 
-        # In a full-scale vision implementation, we'd pass the actual image bytes/files.
-        response = model.generate_content(prompt)
+        # Gemini REST API (Flash 1.5)
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
         
-        # Clean response text as it might be wrapped in ```json
-        raw_text = response.text.strip()
+        payload = {
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }]
+        }
+
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # Verify response structure
+        if 'candidates' not in data or not data['candidates']:
+            raise Exception("No analysis candidates returned from Gemini")
+
+        raw_text = data['candidates'][0]['content']['parts'][0]['text']
+        
+        # Clean JSON from markdown blocks if present
+        raw_text = raw_text.strip()
         if "```json" in raw_text:
             raw_text = raw_text.split("```json")[1].split("```")[0].strip()
         elif "```" in raw_text:
@@ -63,13 +72,13 @@ def check_content(text: str, image_url: str | None = None, video_url: str | None
             "score": float(result.get("score", 0.1)),
             "status": result.get("status", "approved"),
             "category": result.get("category", "unclassified"),
-            "details": [result.get("reason", "AI Assessed")],
+            "details": [result.get("reason", "AI Assessed via REST")],
             "language": "en",
             "transcript": None
         }
 
     except Exception as e:
-        print(f"Gemini Moderation Error: {e}")
+        print(f"Gemini REST Moderation Error: {e}")
         return {
             "score": 0.5,
             "status": "flagged",

@@ -8,4 +8,4 @@ dnspython==2.6.1
 python-multipart
 twilio
 cloudinary
-google-generativeai
+requests
