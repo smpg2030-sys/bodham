@@ -55,6 +55,27 @@ class PostCreate(BaseModel):
     video_url: str | None = None
 
 
+    user_id: str
+    title: str | None = None
+    content: str
+    date: str
+    created_at: str
+
+
+class CommentCreate(BaseModel):
+    content: str
+
+
+class CommentResponse(BaseModel):
+    id: str
+    user_id: str
+    author_name: str
+    author_profile_pic: str | None = None
+    content: str
+    created_at: str
+
+
+# Update PostResponse to include Interaction Data
 class PostResponse(BaseModel):
     id: str
     user_id: str
@@ -67,6 +88,11 @@ class PostResponse(BaseModel):
     status: str  # "pending", "approved", "rejected"
     created_at: str
     rejection_reason: str | None = None
+    # Social Stats
+    likes_count: int = 0
+    comments_count: int = 0
+    is_liked_by_me: bool = False
+
 
 class VideoCreate(BaseModel):
     title: str | None = None

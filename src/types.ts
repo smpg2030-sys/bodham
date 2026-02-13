@@ -22,6 +22,18 @@ export interface Post {
     created_at: string;
     rejection_reason?: string;
     author_profile_pic?: string | null;
+    likes_count: number;
+    comments_count: number;
+    is_liked_by_me: boolean;
+}
+
+export interface Comment {
+    id: string;
+    user_id: string;
+    author_name: string;
+    author_profile_pic?: string | null;
+    content: string;
+    created_at: string;
 }
 
 export interface Video {

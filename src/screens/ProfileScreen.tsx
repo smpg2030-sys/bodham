@@ -6,6 +6,7 @@ import { Post, Video, AppFriend, User, JournalEntry } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
 import VideoPlayer from "../components/VideoPlayer";
 import GrowthTree from "../components/GrowthTree";
+import PostCard from "../components/PostCard";
 
 const getApiBase = () => {
   const base = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000/api" : "/api");
@@ -397,6 +398,55 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleLikeToggle = async (postId: string) => {
+    if (!currentUser) return;
+    try {
+      setMyPosts(prev => prev.map(p => {
+        if (p.id === postId) {
+          const currentLikes = p.likes_count || 0;
+          const isLiked = !!p.is_liked_by_me;
+          return {
+            ...p,
+            likes_count: isLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1,
+            is_liked_by_me: !isLiked
+          };
+        }
+        return p;
+      }));
+      await fetch(`${API_BASE}/posts/${postId}/like`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: currentUser.id })
+      });
+    } catch (error) {
+      console.error("Like toggle failed", error);
+    }
+  };
+
+  const handleCommentSubmit = async (postId: string, content: string) => {
+    if (!currentUser) return;
+    try {
+      const res = await fetch(`${API_BASE}/posts/${postId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: currentUser.id, content })
+      });
+      if (res.ok) {
+        setMyPosts(prev => prev.map(p => {
+          if (p.id === postId) {
+            return {
+              ...p,
+              comments_count: (p.comments_count || 0) + 1
+            };
+          }
+          return p;
+        }));
+      }
+    } catch (error) {
+      console.error("Comment submit failed", error);
+    }
+  };
+
   const getStatusBadge = (post: Post) => {
     switch (post.status) {
       case "approved":
@@ -679,40 +729,17 @@ export default function ProfileScreen() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm relative group hover:shadow-md transition-shadow"
                   >
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-center gap-2">
-                        {getStatusBadge(post)}
-                        <span className="text-[10px] font-medium text-slate-400">{new Date(post.created_at).toLocaleDateString()}</span>
-                      </div>
-                      <button
-                        onClick={() => handleDeletePost(post.id)}
-                        className="text-slate-300 hover:text-rose-500 p-1.5 rounded-full hover:bg-rose-50 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <p className="text-slate-700 text-sm mb-3 leading-relaxed">{post.content}</p>
-                    {post.image_url && (
-                      <div className="mt-3 bg-slate-50 rounded-xl overflow-hidden border border-slate-100">
-                        <img
-                          src={post.image_url.startsWith("/static") ? `${API_BASE}${post.image_url}` : post.image_url}
-                          alt="Post content"
-                          className="w-full h-auto max-h-[300px] object-cover"
-                        />
-                      </div>
-                    )}
-                    {post.status === "rejected" && (
-                      <div className="bg-rose-50 p-3 rounded-xl mt-3 border border-rose-100">
-                        <p className="text-rose-700 font-bold text-xs mb-1 flex items-center gap-1">
-                          <span className="text-sm">⚠️</span> Community Guidelines Issue
-                        </p>
-                        {post.rejection_reason && (
-                          <p className="text-rose-600 text-xs pl-5">
-                            Reason: {post.rejection_reason}
-                          </p>
-                        )}
+                    <PostCard
+                      post={post}
+                      currentUserId={currentUser?.id || ""}
+                      onLikeToggle={handleLikeToggle}
+                      onCommentSubmit={handleCommentSubmit}
+                      onDelete={handleDeletePost}
+                    />
+                    {post.status === "rejected" && post.rejection_reason && (
+                      <div className="bg-rose-50 p-3 rounded-xl mt-2 mx-1 border border-rose-100 text-xs text-rose-700">
+                        <span className="font-bold">Reason:</span> {post.rejection_reason}
                       </div>
                     )}
                   </motion.div>

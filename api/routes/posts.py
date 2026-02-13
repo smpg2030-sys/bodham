@@ -57,6 +57,16 @@ def get_feed(user_id: str | None = None):
         author = db.users.find_one({"_id": ObjectId(doc["user_id"])})
         if author:
             doc["author_profile_pic"] = author.get("profile_pic")
+        
+        # Social Stats
+        doc["likes_count"] = db.likes.count_documents({"post_id": doc["id"]})
+        doc["comments_count"] = db.comments.count_documents({"post_id": doc["id"]})
+        
+        if user_id:
+            doc["is_liked_by_me"] = bool(db.likes.find_one({"post_id": doc["id"], "user_id": user_id}))
+        else:
+            doc["is_liked_by_me"] = False
+            
         results.append(doc)
     return results
 
@@ -82,6 +92,12 @@ def get_my_posts(user_id: str):
     for doc in combined_posts:
         doc["id"] = str(doc["_id"])
         doc["author_profile_pic"] = profile_pic
+
+        # Social Stats
+        doc["likes_count"] = db.likes.count_documents({"post_id": doc["id"]})
+        doc["comments_count"] = db.comments.count_documents({"post_id": doc["id"]})
+        doc["is_liked_by_me"] = bool(db.likes.find_one({"post_id": doc["id"], "user_id": user_id}))
+
         results.append(doc)
     return results
 

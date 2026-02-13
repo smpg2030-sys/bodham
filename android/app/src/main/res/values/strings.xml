@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Bodham</string>
+    <string name="title_activity_main">Bodham</string>
+    <string name="package_name">com.bodham.app</string>
+    <string name="custom_url_scheme">com.bodham.app</string>
+</resources>

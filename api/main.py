@@ -77,6 +77,10 @@ app.include_router(videos_router, prefix=prefix)
 app.include_router(stories_router, prefix=prefix + "/community-stories")
 app.include_router(journals_router, prefix=prefix)
 
+from routes.interactions import router as interactions_router
+app.include_router(interactions_router, prefix=prefix)
+
+
 
 @app.get(prefix + "/health")
 def health():
