@@ -297,6 +297,18 @@ def optimize_db(role: str):
     
     return {"message": "Database optimized with indexes"}
 
+@router.get("/debug-ai-keys")
+def debug_ai_keys():
+    from config import GEMINI_API_KEY, SIGHTENGINE_API_USER, SIGHTENGINE_API_SECRET
+    import os
+    return {
+        "GEMINI_KEY_SET": bool(GEMINI_API_KEY and len(GEMINI_API_KEY.strip()) > 10),
+        "SIGHTENGINE_USER_SET": bool(SIGHTENGINE_API_USER and len(SIGHTENGINE_API_USER.strip()) > 5),
+        "SIGHTENGINE_SECRET_SET": bool(SIGHTENGINE_API_SECRET and len(SIGHTENGINE_API_SECRET.strip()) > 5),
+        "VERCEL_ENV": os.getenv("VERCEL", "false"),
+        "MESSAGE": "Check this if AI_FAIL persists. If False, keys are not reaching Vercel."
+    }
+
 # User requested standardized endpoint
 @flat_router.post("/approve-video")
 def approve_video_standard(payload: dict, role: str = "admin"):
