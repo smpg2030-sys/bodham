@@ -27,7 +27,7 @@ def check_with_sightengine(text: str, image_url: str | None = None, video_url: s
     secret = (SIGHTENGINE_API_SECRET or "").strip()
     
     if not user or not secret:
-        return {"status": "error", "details": f"Sightengine keys missing (U:{len(user)}, S:{len(secret)})"}
+        return {"status": "error", "details": "Sightengine keys missing", "code": "SE_MISSING"}
 
     try:
         # 1. Text (Standard)
@@ -35,9 +35,9 @@ def check_with_sightengine(text: str, image_url: str | None = None, video_url: s
             res = requests.post('https://api.sightengine.com/1.0/text/check.json', data={
                 'text': text, 'lang': 'en', 'mode': 'standard',
                 'api_user': user, 'api_secret': secret
-            }, timeout=8)
+            }, timeout=5)
             if res.status_code != 200:
-                return {"status": "error", "details": f"SE Text HTTP {res.status_code}: {res.text[:50]}"}
+                return {"status": "error", "details": f"SE Text {res.status_code}", "code": f"SE_{res.status_code}"}
             
             data = res.json()
             if data.get('profanity', {}).get('matches'):
@@ -48,11 +48,16 @@ def check_with_sightengine(text: str, image_url: str | None = None, video_url: s
             res = requests.get('https://api.sightengine.com/1.0/check.json', params={
                 'models': 'nudity-2.0,wad,scam,suggestive,gore', 'url': image_url,
                 'api_user': user, 'api_secret': secret
-            }, timeout=12)
+            }, timeout=10)
             if res.status_code != 200:
-                return {"status": "error", "details": f"SE Image HTTP {res.status_code}: {res.text[:50]}"}
+                err_body = res.json() if res.headers.get("Content-Type") == "application/json" else {}
+                err_type = err_body.get("error", {}).get("type", "Unknown")
+                return {"status": "error", "details": f"SE Img {res.status_code}: {err_type}", "code": f"SE_{res.status_code}"}
             
             data = res.json()
+            if data.get('status') != 'success':
+                 return {"status": "error", "details": f"SE API Fail: {data.get('error')}", "code": "SE_API_FAIL"}
+
             n = data.get('nudity', {})
             # Extreme thresholds for Bodham
             if (n.get('raw', 0) > 0.05 or n.get('partial', 0) > 0.1 or n.get('erotica', 0) > 0.1 or n.get('sexual_display', 0) > 0.1):
@@ -63,7 +68,7 @@ def check_with_sightengine(text: str, image_url: str | None = None, video_url: s
 
         return None # Proceed to Gemini
     except Exception as e:
-        return {"status": "error", "details": f"SE Exception: {str(e)}"}
+        return {"status": "error", "details": f"SE Ex: {str(e)}", "code": "SE_EXCEPTION"}
 
 def check_content(text: str, image_url: str | None = None, video_url: str | None = None) -> dict:
     """Hybrid: Heuristics -> Sightengine -> Gemini."""
@@ -79,23 +84,23 @@ def check_content(text: str, image_url: str | None = None, video_url: str | None
     # Gemini Pass
     gemini_key = (GEMINI_API_KEY or "").strip()
     if not gemini_key:
-        se_err = f" (SE: {se['details']})" if (se and se['status'] == 'error') else ""
-        return {"score": 0.5, "status": "flagged", "category": "api_fail", "details": [f"Missing Keys{se_err}"], "language": "en"}
+        se_code = se.get("code", "SE_OK") if (se and se.get("status") == "error") else "SE_OK"
+        return {"score": 0.5, "status": "flagged", "category": f"MISSING_KEYS_{se_code}", "details": ["Keys Missing"], "language": "en"}
 
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
         prompt = f"Moderate for mindfulness app. Text: '{t}'. Media: {image_url or 'None'}. Return JSON {{'status':'approved'|'rejected', 'reason':'...'}}"
         
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        res = requests.post(url, json=payload, timeout=10)
+        res = requests.post(url, json=payload, timeout=8)
         
         if res.status_code != 200:
-            se_msg = se.get("details") if (se and se['status'] == 'error') else "SE_OK"
-            return {"score": 0.5, "status": "flagged", "category": "api_fail", "details": [f"Geni HTTP {res.status_code} (SE: {se_msg})"], "language": "en"}
+            se_code = se.get("code", "SE_OK") if (se and se.get("status") == "error") else "SE_OK"
+            return {"score": 0.5, "status": "flagged", "category": f"GENI_{res.status_code}_{se_code}", "details": [f"Gemini Fail: {res.text[:50]}"], "language": "en"}
 
         data = res.json()
         if 'candidates' not in data:
-            return {"score": 1.0, "status": "rejected", "category": "safety_block", "details": ["Provider safety block."]}
+            return {"score": 1.0, "status": "rejected", "category": "SAFETY_BLOCK", "details": ["Provider safety block."]}
 
         raw = data['candidates'][0]['content']['parts'][0]['text']
         if "```" in raw: raw = raw.split("```")[1].replace("json", "").strip()
@@ -113,5 +118,5 @@ def check_content(text: str, image_url: str | None = None, video_url: str | None
             "language": "en"
         }
     except Exception as e:
-        se_msg = se.get("details") if (se and se['status'] == 'error') else "None"
-        return {"score": 0.5, "status": "flagged", "category": "api_fail", "details": [f"Failure: {str(e)} (SE: {se_msg})"], "language": "en"}
+        se_code = se.get("code", "SE_OK") if (se and se.get("status") == "error") else "SE_OK"
+        return {"score": 0.5, "status": "flagged", "category": f"EX_{se_code}", "details": [f"Exception: {str(e)}"], "language": "en"}
