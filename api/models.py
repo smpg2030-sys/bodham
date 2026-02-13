@@ -84,6 +84,8 @@ class PostResponse(BaseModel):
     status: str  # "pending", "approved", "rejected"
     created_at: str
     rejection_reason: str | None = None
+    moderation_score: float | None = None
+    moderation_details: list[str] | None = None
     # Social Stats
     likes_count: int = 0
     comments_count: int = 0
@@ -108,6 +110,8 @@ class VideoResponse(BaseModel):
     status: str  # "pending", "approved", "rejected"
     created_at: str
     rejection_reason: str | None = None
+    moderation_score: float | None = None
+    moderation_details: list[str] | None = None
 
 
 class NewsArticle(BaseModel):

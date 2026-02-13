@@ -20,9 +20,11 @@ export interface Post {
     content: string;
     image_url?: string;
     video_url?: string;
-    status: "pending" | "approved" | "rejected";
+    status: "pending" | "approved" | "rejected" | "flagged";
     created_at: string;
     rejection_reason?: string;
+    moderation_score?: number;
+    moderation_details?: string[];
     author_profile_pic?: string | null;
     likes_count: number;
     comments_count: number;

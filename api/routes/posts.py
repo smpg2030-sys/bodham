@@ -1,13 +1,57 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from database import get_db
 from models import PostCreate, PostResponse
 from bson import ObjectId
 from datetime import datetime
+from services.moderation import check_content
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 
+def process_post_moderation(post_id: str):
+    """Background task to moderate post content."""
+    try:
+        db = get_db()
+        if db is None: return
+
+        post = db.pending_posts.find_one({"_id": ObjectId(post_id)})
+        if not post: return
+
+        # AI Check
+        result = check_content(post.get("content", ""), post.get("image_url"), post.get("video_url"))
+        
+        updates = {
+            "moderation_score": result["score"],
+            "moderation_details": result["details"]
+        }
+
+        if result["status"] == "approved":
+            # Auto-publish: Move to approved posts
+            post["status"] = "approved"
+            post.update(updates)
+            
+            # Remove _id to allow new insertion (or keep same ID?)
+            # Usually better to keep same ID.
+            # db.posts.insert_one(post) -> This might fail if _id exists? 
+            # It's a move, so checking if ID collision is possible. 
+            # Ideally ids should be unique across.
+            
+            db.posts.insert_one(post)
+            db.pending_posts.delete_one({"_id": ObjectId(post_id)})
+            
+        elif result["status"] == "flagged":
+            updates["status"] = "flagged"
+            db.pending_posts.update_one({"_id": ObjectId(post_id)}, {"$set": updates})
+            
+        else: # rejected
+            updates["status"] = "rejected"
+            updates["rejection_reason"] = "AI: High risk content detected"
+            db.pending_posts.update_one({"_id": ObjectId(post_id)}, {"$set": updates})
+            
+    except Exception as e:
+        print(f"Moderation error for post {post_id}: {e}")
+
 @router.post("/", response_model=PostResponse)
-def create_post(post: PostCreate, user_id: str, author_name: str):
+def create_post(post: PostCreate, user_id: str, author_name: str, background_tasks: BackgroundTasks):
     db = get_db()
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established")
@@ -18,13 +62,17 @@ def create_post(post: PostCreate, user_id: str, author_name: str):
         "content": post.content,
         "image_url": post.image_url,
         "video_url": post.video_url,
-        "status": "pending",
+        "status": "pending", # Initial status
         "created_at": datetime.utcnow().isoformat(),
         "rejection_reason": None
     }
     
     result = db.pending_posts.insert_one(doc)
     doc["id"] = str(result.inserted_id)
+    
+    # Trigger Async Moderation
+    background_tasks.add_task(process_post_moderation, doc["id"])
+    
     return doc
 
 @router.get("/", response_model=list[PostResponse])

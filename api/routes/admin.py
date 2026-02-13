@@ -16,6 +16,9 @@ class PostStatusUpdate(BaseModel):
     status: str
     rejection_reason: str | None = None
 
+class BanRequest(BaseModel):
+    reason: str
+
 @router.get("/users", response_model=List[UserResponse])
 def get_all_users(role: str | None = None):
     if role != "admin":
@@ -39,6 +42,37 @@ def get_all_users(role: str | None = None):
         ))
     return all_users
 
+@router.post("/users/{user_id}/ban")
+def ban_user(user_id: str, ban_data: BanRequest, role: str):
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden: Admin access required")
+    
+    db = get_db()
+    
+    # 1. Update user role/status
+    db.users.update_one(
+        {"_id": ObjectId(user_id)}, 
+        {"$set": {"role": "banned", "ban_reason": ban_data.reason}}
+    )
+    
+    # 2. Delete all their pending/approved posts? Or just ban user?
+    # Usually ban implies stopping future access. Content removal is separate or optional.
+    # We will just ban the user login for now.
+    
+    return {"message": f"User {user_id} banned successfully"}
+
+@router.delete("/posts/{post_id}")
+def admin_delete_post(post_id: str, role: str):
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden: Admin access required")
+    
+    db = get_db()
+    # Try delete from both
+    db.posts.delete_one({"_id": ObjectId(post_id)})
+    db.pending_posts.delete_one({"_id": ObjectId(post_id)})
+    
+    return {"message": "Post deleted by admin"}
+
 @router.get("/stats")
 def get_stats(role: str):
     if role != "admin":
@@ -52,6 +86,7 @@ def get_stats(role: str):
     mobile_users = db.users.count_documents({"mobile": {"$ne": None}})
     
     pending_posts = db.pending_posts.count_documents({"status": "pending"})
+    flagged_posts = db.pending_posts.count_documents({"status": "flagged"}) 
     
     # Count pending videos from MindRiseDB
     client = get_client()
@@ -62,7 +97,8 @@ def get_stats(role: str):
         "total_users": user_count,
         "email_users": email_users,
         "mobile_users": mobile_users,
-        "pending_moderation": pending_posts + pending_videos
+        "pending_moderation": pending_posts + pending_videos,
+        "flagged_posts": flagged_posts
     }
 
 @router.get("/posts", response_model=List[PostResponse])
@@ -76,7 +112,7 @@ def get_posts(role: str, status: str = "all"):
     posts_cursor = []
     if status == "approved":
         posts_cursor = db.posts.find().sort("created_at", -1)
-    elif status == "pending" or status == "rejected":
+    elif status in ["pending", "rejected", "flagged"]:
         posts_cursor = db.pending_posts.find({"status": status}).sort("created_at", -1)
     else:  # status == "all"
         approved = list(db.posts.find())
