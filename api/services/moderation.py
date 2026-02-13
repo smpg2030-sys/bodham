@@ -21,14 +21,12 @@ def is_obviously_harmful(text: str) -> bool:
     ]
     return any(re.search(p, text) for p in harmful_patterns)
 
-def check_with_sightengine(text: str, image_url: str | None = None) -> dict | None:
+def check_with_sightengine(text: str, image_url: str | None = None, video_url: str | None = None) -> dict | None:
     """Specialized moderation via Sightengine (High efficiency for media)."""
     if not SIGHTENGINE_API_USER or not SIGHTENGINE_API_SECRET:
         return None
 
     try:
-        results = []
-        
         # 1. Text Moderation
         if text:
             text_params = {
@@ -42,7 +40,6 @@ def check_with_sightengine(text: str, image_url: str | None = None) -> dict | No
             if res.status_code == 200:
                 data = res.json()
                 if data.get('status') == 'success':
-                    # Check for profanity or self-harm
                     profanity = data.get('profanity', {}).get('matches', [])
                     if profanity:
                         return {
@@ -64,7 +61,6 @@ def check_with_sightengine(text: str, image_url: str | None = None) -> dict | No
             if res.status_code == 200:
                 data = res.json()
                 if data.get('status') == 'success':
-                    # Logic for image rejection based on probabilities
                     nudity = data.get('nudity', {})
                     if nudity.get('sexual_activity', 0) > 0.5 or nudity.get('sexual_display', 0) > 0.5:
                         return {"score": 1.0, "status": "rejected", "category": "nudity", "details": ["Sexual content detected"]}
@@ -73,7 +69,27 @@ def check_with_sightengine(text: str, image_url: str | None = None) -> dict | No
                     if scam > 0.7:
                         return {"score": 0.9, "status": "rejected", "category": "scam", "details": ["Scam pattern detected"]}
 
-        return None # Inconclusive, move to Gemini
+        # 3. Video Moderation (New!)
+        if video_url:
+            # For videos, we use the video/check-sync or video/check (async is preferred for large videos)
+            # But Sightengine's video check URL works well for cloud-hosted files.
+            # Note: Video moderation is typically slower/asynchronous but we can trigger it.
+            video_params = {
+                'stream_url': video_url,
+                'api_user': SIGHTENGINE_API_USER,
+                'api_secret': SIGHTENGINE_API_SECRET
+            }
+            # This triggers a check. For simple integration, if it fails or needs callback, 
+            # we let Gemini/Admin handle the final verdict.
+            res = requests.get('https://api.sightengine.com/1.0/video/check.json', params=video_params, timeout=10)
+            if res.status_code == 200:
+                 # If we get an instant result (for very short videos/cache), processing it
+                 # Usually it returns a request_id.
+                 data = res.json()
+                 if data.get('status') == 'success':
+                     print(f"Sightengine Video check triggered: {data.get('request_id')}")
+
+        return None # Inconclusive or handled, move to Gemini/Admin fallback
     except Exception as e:
         print(f"Sightengine Error: {e}")
         return None
@@ -103,7 +119,7 @@ def check_content(text: str, image_url: str | None = None, video_url: str | None
         }
 
     # 3. Sightengine Pass (Specialized Media/Text)
-    sight_result = check_with_sightengine(text, image_url)
+    sight_result = check_with_sightengine(text, image_url, video_url)
     if sight_result:
         return sight_result
 
