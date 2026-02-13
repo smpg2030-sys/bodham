@@ -17,6 +17,7 @@ def check_content(text: str, image_url: str | None = None, video_url: str | None
     
     # 1. Text Analysis (Heuristics)
     text_lower = text.lower()
+    category = "unclassified"
     
     # Positive/Safe categories (Bonus for safety)
     positive_keywords = ["motivation", "inspire", "peace", "calm", "love", "community", "dance", "fun", "humor", "meditate"]
@@ -28,13 +29,23 @@ def check_content(text: str, image_url: str | None = None, video_url: str | None
     flagged_keywords = ["political", "controversial", "scam", "money", "invest", "crypto"]
     if any(word in text_lower for word in flagged_keywords):
         score += 0.4
+        category = "controversial"
         details.append("Controversial keywords detected")
         
     # High risk / Banned keywords (High risk)
-    banned_keywords = ["hate", "violence", "kill", "attack", "abuse", "xxx", "nsfw"]
+    banned_keywords = ["hate", "violence", "kill", "attack", "abuse", "xxx", "nsfw", "naked", "sex", "porn"]
     if any(word in text_lower for word in banned_keywords):
         score += 0.8
+        category = "harmful_content"
         details.append("Harmful content detected")
+
+    # 2. Media Analysis (Precautionary Flagging)
+    # Since we don't have a Vision AI integrated yet, we MUST flag all media for review.
+    if image_url or video_url:
+        if score < 0.5: # If not already rejected/flagged by text
+            score = 0.5
+            category = "media_review"
+            details.append("Media detected: Flagged for manual review (No Vision AI yet)")
 
     # clamp score
     score = max(0.0, min(1.0, score))
@@ -50,5 +61,8 @@ def check_content(text: str, image_url: str | None = None, video_url: str | None
     return {
         "score": round(score, 2),
         "status": status,
-        "details": details
+        "category": category,
+        "details": details,
+        "language": "en", # Placeholder
+        "transcript": None # Placeholder for video transcript
     }

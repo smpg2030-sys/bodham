@@ -84,8 +84,12 @@ class PostResponse(BaseModel):
     status: str  # "pending", "approved", "rejected"
     created_at: str
     rejection_reason: str | None = None
-    moderation_score: float | None = None
-    moderation_details: list[str] | None = None
+    # Detailed Moderation Tracking
+    moderation_status: str = "pending" # approved, rejected, flagged, pending
+    moderation_category: str | None = None
+    moderation_score: float = 0.0
+    moderation_source: str = "AI" # AI, admin_override
+    moderation_logs: list[dict] = [] # [{action: str, timestamp: str, operator: str}]
     # Social Stats
     likes_count: int = 0
     comments_count: int = 0
@@ -110,8 +114,11 @@ class VideoResponse(BaseModel):
     status: str  # "pending", "approved", "rejected"
     created_at: str
     rejection_reason: str | None = None
-    moderation_score: float | None = None
-    moderation_details: list[str] | None = None
+    moderation_status: str = "pending"
+    moderation_category: str | None = None
+    moderation_score: float = 0.0
+    moderation_source: str = "AI"
+    moderation_logs: list[dict] = []
 
 
 class NewsArticle(BaseModel):

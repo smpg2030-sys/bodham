@@ -102,27 +102,43 @@ def get_stats(role: str):
     }
 
 @router.get("/posts", response_model=List[PostResponse])
-def get_posts(role: str, status: str = "all"):
+def get_posts(role: str, status: str = "all", search_user: str | None = None):
     if role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     db = get_db()
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established")
     
-    posts_cursor = []
-    if status == "approved":
-        posts_cursor = db.posts.find().sort("created_at", -1)
-    elif status in ["pending", "rejected", "flagged"]:
-        posts_cursor = db.pending_posts.find({"status": status}).sort("created_at", -1)
-    else:  # status == "all"
-        approved = list(db.posts.find())
-        pending_rejected = list(db.pending_posts.find())
-        combined = approved + pending_rejected
-        combined.sort(key=lambda x: x.get("created_at", ""), reverse=True)
-        posts_cursor = combined
+    query = {}
+    if status != "all":
+        query["status"] = status
+    
+    if search_user:
+        # Search by user ID or find user by email/mobile first
+        user_query = {"$or": [
+            {"email": {"$regex": search_user, "$options": "i"}},
+            {"mobile": {"$regex": search_user, "$options": "i"}},
+            {"full_name": {"$regex": search_user, "$options": "i"}}
+        ]}
+        try:
+            if len(search_user) == 24: # Likely ObjectId
+                user_query["$or"].append({"_id": ObjectId(search_user)})
+        except: pass
         
+        users = list(db.users.find(user_query))
+        user_ids = [str(u["_id"]) for u in users]
+        query["user_id"] = {"$in": user_ids} if user_ids else "NONE"
+
+    # Fetch from both collections
+    approved = list(db.posts.find(query))
+    pending_rejected = list(db.pending_posts.find(query))
+    combined = approved + pending_rejected
+    
+    # Sort and return
+    combined.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    
     results = []
-    for doc in posts_cursor:
+    for doc in combined:
         doc["id"] = str(doc["_id"])
         user = db.users.find_one({"_id": ObjectId(doc["user_id"])})
         if user:
@@ -136,17 +152,48 @@ def update_post_status(post_id: str, update: PostStatusUpdate, role: str):
     if role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     db = get_db()
-    if update.status == "approved":
-        post = db.pending_posts.find_one({"_id": ObjectId(post_id)})
-        if not post:
-            return {"message": "Post already approved or not found"}
-        post["status"] = "approved"
+    
+    # Find post in pending first, then approved
+    post = db.pending_posts.find_one({"_id": ObjectId(post_id)})
+    collection_from = "pending_posts"
+    if not post:
+        post = db.posts.find_one({"_id": ObjectId(post_id)})
+        collection_from = "posts"
+        
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    timestamp = datetime.utcnow().isoformat()
+    log_entry = {
+        "action": f"Admin Override: {update.status}",
+        "timestamp": timestamp,
+        "operator": "ADMIN_OVERRIDE",
+        "reason": update.rejection_reason or "Manually updated by admin"
+    }
+
+    moderation_updates = {
+        "moderation_status": update.status,
+        "moderation_source": "admin_override",
+        "moderation_logs": post.get("moderation_logs", []) + [log_entry],
+        "status": update.status,
+        "rejection_reason": update.rejection_reason if update.status == "rejected" else None
+    }
+
+    if update.status == "approved" and collection_from == "pending_posts":
+        # Move to approved
+        post.update(moderation_updates)
         db.posts.insert_one(post)
         db.pending_posts.delete_one({"_id": ObjectId(post_id)})
-        return {"message": "Post approved"}
+    elif update.status == "rejected" and collection_from == "posts":
+        # Move to pending/rejected
+        post.update(moderation_updates)
+        db.pending_posts.insert_one(post)
+        db.posts.delete_one({"_id": ObjectId(post_id)})
     else:
-        db.pending_posts.update_one({"_id": ObjectId(post_id)}, {"$set": {"status": "rejected", "rejection_reason": update.rejection_reason}})
-        return {"message": "Post rejected"}
+        # Just update in current collection
+        db[collection_from].update_one({"_id": ObjectId(post_id)}, {"$set": moderation_updates})
+
+    return {"message": f"Post status updated to {update.status} with override log."}
 
 @router.get("/videos", response_model=List[VideoResponse])
 def get_videos(role: str, status: str = "all"):
@@ -202,18 +249,53 @@ def update_video_status(video_id: str, update: PostStatusUpdate, role: str):
         raise HTTPException(status_code=403, detail="Admin access required")
     client = get_client()
     db = client[DB_NAME]
+    
+    video = db.user_videos.find_one({"_id": ObjectId(video_id)})
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    timestamp = datetime.utcnow().isoformat()
+    log_entry = {
+        "action": f"Admin Override: {update.status}",
+        "timestamp": timestamp,
+        "operator": "ADMIN_OVERRIDE",
+        "reason": update.rejection_reason or "Manually updated by admin"
+    }
+
     db_status = update.status.lower() 
-    result = db.user_videos.update_one(
+    db.user_videos.update_one(
         {"_id": ObjectId(video_id)},
         {"$set": {
             "status": db_status,
+            "moderation_status": update.status,
+            "moderation_source": "admin_override",
+            "moderation_logs": video.get("moderation_logs", []) + [log_entry],
             "rejection_reason": update.rejection_reason,
-            "updated_at": datetime.utcnow().isoformat()
+            "updated_at": timestamp
         }}
     )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Video not found")
-    return {"message": f"Video {update.status} successfully"}
+    return {"message": f"Video {update.status} successfully overridden"}
+
+@router.post("/optimize")
+def optimize_db(role: str):
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    db = get_db()
+    
+    # Indexing for performance
+    db.users.create_index([("email", 1)])
+    db.users.create_index([("mobile", 1)])
+    db.posts.create_index([("user_id", 1)])
+    db.posts.create_index([("status", 1)])
+    db.pending_posts.create_index([("user_id", 1)])
+    db.pending_posts.create_index([("status", 1)])
+    
+    client = get_client()
+    db_v = client[DB_NAME]
+    db_v.user_videos.create_index([("user_id", 1)])
+    db_v.user_videos.create_index([("status", 1)])
+    
+    return {"message": "Database optimized with indexes"}
 
 # User requested standardized endpoint
 @flat_router.post("/approve-video")

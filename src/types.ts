@@ -23,8 +23,17 @@ export interface Post {
     status: "pending" | "approved" | "rejected" | "flagged";
     created_at: string;
     rejection_reason?: string;
+    moderation_status?: "pending" | "approved" | "rejected" | "flagged";
+    moderation_category?: string;
     moderation_score?: number;
-    moderation_details?: string[];
+    moderation_source?: "AI" | "admin_override";
+    moderation_logs?: {
+        action: string;
+        timestamp: string;
+        operator: string;
+        reason?: string;
+        details?: string[];
+    }[];
     author_profile_pic?: string | null;
     likes_count: number;
     comments_count: number;

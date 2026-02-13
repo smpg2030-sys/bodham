@@ -19,22 +19,26 @@ def process_post_moderation(post_id: str):
         # AI Check
         result = check_content(post.get("content", ""), post.get("image_url"), post.get("video_url"))
         
+        timestamp = datetime.utcnow().isoformat()
+        log_entry = {
+            "action": f"AI Moderation: {result['status']}",
+            "timestamp": timestamp,
+            "operator": "AI_SYSTEM",
+            "details": result["details"]
+        }
+
         updates = {
             "moderation_score": result["score"],
-            "moderation_details": result["details"]
+            "moderation_status": result["status"],
+            "moderation_category": result["category"],
+            "moderation_source": "AI",
+            "moderation_logs": post.get("moderation_logs", []) + [log_entry]
         }
 
         if result["status"] == "approved":
             # Auto-publish: Move to approved posts
-            post["status"] = "approved"
             post.update(updates)
-            
-            # Remove _id to allow new insertion (or keep same ID?)
-            # Usually better to keep same ID.
-            # db.posts.insert_one(post) -> This might fail if _id exists? 
-            # It's a move, so checking if ID collision is possible. 
-            # Ideally ids should be unique across.
-            
+            post["status"] = "approved"
             db.posts.insert_one(post)
             db.pending_posts.delete_one({"_id": ObjectId(post_id)})
             
@@ -44,7 +48,7 @@ def process_post_moderation(post_id: str):
             
         else: # rejected
             updates["status"] = "rejected"
-            updates["rejection_reason"] = "AI: High risk content detected"
+            updates["rejection_reason"] = f"AI Rejection ({result['category']}): {', '.join(result['details'])}"
             db.pending_posts.update_one({"_id": ObjectId(post_id)}, {"$set": updates})
             
     except Exception as e:
@@ -62,7 +66,9 @@ def create_post(post: PostCreate, user_id: str, author_name: str, background_tas
         "content": post.content,
         "image_url": post.image_url,
         "video_url": post.video_url,
-        "status": "pending", # Initial status
+        "status": "pending", 
+        "moderation_status": "pending",
+        "moderation_logs": [],
         "created_at": datetime.utcnow().isoformat(),
         "rejection_reason": None
     }
@@ -97,10 +103,14 @@ def get_feed(user_id: str | None = None):
         for f in friendships:
             friend_ids.append(f["user2"] if f["user1"] == user_id else f["user1"])
             
-        posts_cursor = db.posts.find({"user_id": {"$in": friend_ids}}).sort("created_at", -1)
+        # ONLY show AI/Admin approved posts
+        posts_cursor = db.posts.find({
+            "user_id": {"$in": friend_ids},
+            "status": "approved"
+        }).sort("created_at", -1)
     else:
         # Fallback to all approved posts if no user_id
-        posts_cursor = db.posts.find().sort("created_at", -1)
+        posts_cursor = db.posts.find({"status": "approved"}).sort("created_at", -1)
         
     results = []
     for doc in posts_cursor:

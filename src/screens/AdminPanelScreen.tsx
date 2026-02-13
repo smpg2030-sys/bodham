@@ -23,10 +23,12 @@ export default function AdminPanelScreen() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"users" | "pending" | "flagged" | "history" | "videos">("pending");
   const [historyFilter, setHistoryFilter] = useState<"all" | "approved" | "rejected">("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showLogs, setShowLogs] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
-  }, [user, activeTab, historyFilter]);
+  }, [user, activeTab, historyFilter, searchTerm]);
 
   async function fetchData() {
     if (!user) return;
@@ -35,26 +37,26 @@ export default function AdminPanelScreen() {
       const statsRes = await fetch(`${API_BASE}/admin/stats?role=${user.role}`);
       if (statsRes.ok) setStats(await statsRes.json());
 
+      const searchParam = searchTerm ? `&search_user=${encodeURIComponent(searchTerm)}` : "";
+
       if (activeTab === "users") {
-        const usersRes = await fetch(`${API_BASE}/admin/users?role=${user.role}`);
+        const usersRes = await fetch(`${API_BASE}/admin/users?role=${user.role}${searchParam}`);
         if (usersRes.ok) setUsers(await usersRes.json());
       } else if (activeTab === "pending") {
-        const postsRes = await fetch(`${API_BASE}/admin/posts?status=pending&role=${user.role}`);
+        const postsRes = await fetch(`${API_BASE}/admin/posts?status=pending&role=${user.role}${searchParam}`);
         if (postsRes.ok) setPosts(await postsRes.json());
       } else if (activeTab === "flagged") {
-        const postsRes = await fetch(`${API_BASE}/admin/posts?status=flagged&role=${user.role}`);
+        const postsRes = await fetch(`${API_BASE}/admin/posts?status=flagged&role=${user.role}${searchParam}`);
         if (postsRes.ok) setPosts(await postsRes.json());
       } else if (activeTab === "videos") {
-        const videosRes = await fetch(`${API_BASE}/admin/videos?status=pending&role=${user.role}`);
+        const videosRes = await fetch(`${API_BASE}/admin/videos?status=pending&role=${user.role}${searchParam}`);
         if (videosRes.ok) setVideos(await videosRes.json());
       } else if (activeTab === "history") {
         const statusParam = historyFilter === "all" ? "all" : historyFilter;
-        const postsRes = await fetch(`${API_BASE}/admin/posts?status=${statusParam}&role=${user.role}`);
+        const postsRes = await fetch(`${API_BASE}/admin/posts?status=${statusParam}&role=${user.role}${searchParam}`);
         if (postsRes.ok) {
           let data = await postsRes.json();
-          if (historyFilter === "all") {
-            // Filter out pending and flagged for history view if 'all' is selected, 
-            // typically history means resolved items.
+          if (historyFilter === "all" && !searchTerm) {
             data = data.filter((p: Post) => p.status !== "pending" && p.status !== "flagged");
           }
           setPosts(data);
@@ -160,6 +162,16 @@ export default function AdminPanelScreen() {
           ←
         </button>
         <h1 className="text-2xl font-bold text-slate-800">Admin Dashboard</h1>
+      </div>
+
+      <div className="mb-6">
+        <input
+          type="text"
+          placeholder="Search by user email, name or ID..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm shadow-sm focus:ring-2 focus:ring-slate-200 focus:outline-none transition"
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-6">
@@ -376,16 +388,61 @@ export default function AdminPanelScreen() {
                   </span>
                 </div>
 
-                {/* Moderation Warning */}
-                {(post.status === 'flagged' || (post.moderation_score && post.moderation_score > 0.3)) && (
-                  <div className="mb-3 bg-amber-50 border border-amber-100 rounded-lg p-3 text-xs text-amber-800 flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold">AI Flagged Content (Score: {post.moderation_score})</p>
-                      <p>{post.moderation_details?.join(", ")}</p>
+                {/* Moderation Upgrade - Detailed View */}
+                <div className="mb-4 space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    <div className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md flex items-center gap-1.5 ${(post.moderation_score || 0) > 0.7 ? "bg-red-50 text-red-600 border border-red-100" :
+                        (post.moderation_score || 0) > 0.3 ? "bg-amber-50 text-amber-600 border border-amber-100" :
+                          "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                      }`}>
+                      Score: {post.moderation_score || "0.0"}
+                    </div>
+                    {post.moderation_category && (
+                      <div className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                        Cat: {post.moderation_category}
+                      </div>
+                    )}
+                    <div className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border flex items-center gap-1.5 ${post.moderation_source === 'admin_override' ? "bg-purple-50 text-purple-600 border-purple-100" : "bg-blue-50 text-blue-600 border-blue-100"
+                      }`}>
+                      Source: {post.moderation_source || 'AI'}
                     </div>
                   </div>
-                )}
+
+                  {(post.moderation_logs && post.moderation_logs.length > 0) && (
+                    <div>
+                      <button
+                        onClick={() => setShowLogs(showLogs === post.id ? null : post.id)}
+                        className="text-[10px] font-bold text-slate-400 hover:text-slate-600 underline"
+                      >
+                        {showLogs === post.id ? "Hide Logs" : "View Action Logs"}
+                      </button>
+                      {showLogs === post.id && (
+                        <div className="mt-2 bg-slate-50 rounded-lg p-2 border border-slate-100 space-y-1.5">
+                          {post.moderation_logs.map((log, i) => (
+                            <div key={i} className="text-[9px] text-slate-500 flex justify-between gap-4">
+                              <span><b>{log.operator}:</b> {log.action}</span>
+                              <span className="shrink-0">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* AI Metadata Details */}
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div className="bg-slate-50/50 p-2 rounded border border-slate-100/50">
+                      <p className="text-[8px] uppercase text-slate-400 font-bold mb-0.5">Detected Language</p>
+                      <p className="text-[10px] font-medium text-slate-600">English (Alpha)</p>
+                    </div>
+                    {post.video_url && (
+                      <div className="bg-slate-50/50 p-2 rounded border border-slate-100/50">
+                        <p className="text-[8px] uppercase text-slate-400 font-bold mb-0.5">Video Transcript</p>
+                        <p className="text-[10px] font-medium text-amber-600 italic">Processing...</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 {post.content && (
                   <p className="text-slate-800 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">
