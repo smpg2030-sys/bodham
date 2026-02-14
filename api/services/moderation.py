@@ -58,9 +58,15 @@ def check_with_sightengine(text: str, image_url: str | None = None, video_url: s
 
         # 2. Image (Aggressive)
         if image_url:
+            image_url = str(image_url).strip()
+            # If it's a data URI, Sightengine URL check won't work.
+            if image_url.startswith('data:image'):
+                return {"status": "error", "details": "SE skipping: data URI not supported via URL check", "code": "SE_SKIP_DATA_URI"}
+            if not image_url.startswith(('http://', 'https://')):
+                 return {"status": "error", "details": f"SE skipping: Invalid URL scheme (starts with {image_url[:10]}...)", "code": "SE_SKIP_INVALID_SCHEME"}
+
             try:
-                # Standard POST approach: All arguments in the body
-                # 'suggestive' is part of nudity-2.0, not a standalone model name here
+                # Standard POST approach. 
                 payload = {
                     'models': 'nudity-2.0,wad,scam,gore',
                     'url': image_url,
@@ -75,7 +81,8 @@ def check_with_sightengine(text: str, image_url: str | None = None, video_url: s
                         err_data = res.json()
                         err_msg = err_data.get("error", {}).get("message", "No Message")
                     except: pass
-                    return {"status": "error", "details": f"SE {res.status_code}: {err_msg}", "code": f"SE_{res.status_code}_{res.reason.replace(' ', '_')}"}
+                    # Include snippet of URL in details for debugging
+                    return {"status": "error", "details": f"SE {res.status_code}: {err_msg} | URL: {image_url[:40]}...", "code": f"SE_{res.status_code}"}
                 
                 data = res.json()
                 if data.get('status') != 'success':
@@ -120,10 +127,17 @@ def check_content(text: str, image_url: str | None = None, video_url: str | None
         prompt = f"Moderate for mindfulness app. Text: '{t}'. Media: {image_url or 'None'}. Return JSON {{'status':'approved'|'rejected', 'reason':'...'}}"
         
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        # Small delay to mitigate Gemini 429
-        time.sleep(1)
-        # Requests Session for Gemini too
-        res = session.post(url, json=payload, timeout=10)
+        
+        # Retry Logic for Gemini 429
+        res = None
+        for attempt in range(2):
+            res = session.post(url, json=payload, timeout=10)
+            if res.status_code == 200:
+                break
+            if res.status_code == 429:
+                time.sleep(2) # Wait for rate limit window
+            else:
+                break # Other error, don't retry
         
         if res.status_code != 200:
             se_code = se.get("code", "SE_OK") if (se and se.get("status") == "error") else "SE_OK"
