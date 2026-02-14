@@ -59,13 +59,19 @@ def check_with_sightengine(text: str, image_url: str | None = None, video_url: s
         # 2. Image (Aggressive)
         if image_url:
             try:
-                res = session.get('https://api.sightengine.com/1.0/check.json', params={
-                    'models': 'nudity-2.0,wad,scam,suggestive,gore', 'url': image_url,
-                    'api_user': user, 'api_secret': secret
+                # Use POST to avoid 414 URI Too Long errors
+                res = session.post('https://api.sightengine.com/1.0/check.json', data={
+                    'models': 'nudity-2.0,wad,scam,suggestive,gore', 
+                    'url': image_url,
+                    'api_user': user, 
+                    'api_secret': secret
                 }, timeout=15)
                 
                 if res.status_code != 200:
-                    err_body = res.json() if res.headers.get("Content-Type") == "application/json" else {}
+                    err_body = {}
+                    try:
+                        err_body = res.json()
+                    except: pass
                     err_type = err_body.get("error", {}).get("type", "Unknown")
                     return {"status": "error", "details": f"SE Img {res.status_code}: {err_type}", "code": f"SE_{res.status_code}"}
                 
