@@ -12,6 +12,7 @@ const getApiBase = () => {
 };
 
 const API_BASE = getApiBase();
+const BASE_URL = API_BASE.endsWith("/api") ? API_BASE.slice(0, -4) : API_BASE;
 
 export default function AdminPanelScreen() {
   const navigate = useNavigate();
@@ -325,7 +326,10 @@ export default function AdminPanelScreen() {
                   </div>
                 </div>
                 <div className="bg-black rounded-lg aspect-video mb-4 relative">
-                  <VideoPlayer src={video.video_url} className="w-full h-full" />
+                  <VideoPlayer
+                    src={video.video_url.startsWith("/static") ? `${BASE_URL}${video.video_url}` : video.video_url}
+                    className="w-full h-full"
+                  />
                 </div>
                 <div className="flex gap-3">
                   <button
@@ -392,8 +396,8 @@ export default function AdminPanelScreen() {
                 <div className="mb-4 space-y-2">
                   <div className="flex flex-wrap gap-2">
                     <div className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md flex items-center gap-1.5 ${(post.moderation_score || 0) > 0.7 ? "bg-red-50 text-red-600 border border-red-100" :
-                        (post.moderation_score || 0) > 0.3 ? "bg-amber-50 text-amber-600 border border-amber-100" :
-                          "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                      (post.moderation_score || 0) > 0.3 ? "bg-amber-50 text-amber-600 border border-amber-100" :
+                        "bg-emerald-50 text-emerald-600 border border-emerald-100"
                       }`}>
                       Score: {post.moderation_score || "0.0"}
                     </div>
@@ -452,7 +456,7 @@ export default function AdminPanelScreen() {
                 {post.image_url && (
                   <div className="mt-3 bg-slate-900/5 rounded-xl overflow-hidden flex items-center justify-center">
                     <img
-                      src={post.image_url.startsWith("/static") ? `${API_BASE}${post.image_url}` : post.image_url}
+                      src={post.image_url.startsWith("/static") ? `${BASE_URL}${post.image_url}` : post.image_url}
                       alt="Post content"
                       className="w-full h-auto max-h-[400px] object-contain"
                     />
@@ -462,7 +466,7 @@ export default function AdminPanelScreen() {
                 {post.video_url && (
                   <div className="mt-3 bg-black rounded-xl overflow-hidden aspect-[9/16] max-h-[500px] relative border border-slate-100 shadow-inner group">
                     <VideoPlayer
-                      src={post.video_url.startsWith("/static") ? `${API_BASE}${post.video_url}` : post.video_url}
+                      src={post.video_url.startsWith("/static") ? `${BASE_URL}${post.video_url}` : post.video_url}
                       className="w-full h-full"
                     />
                   </div>

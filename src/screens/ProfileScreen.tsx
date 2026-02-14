@@ -15,6 +15,7 @@ const getApiBase = () => {
 };
 
 const API_BASE = getApiBase();
+const BASE_URL = API_BASE.endsWith("/api") ? API_BASE.slice(0, -4) : API_BASE;
 
 export default function ProfileScreen() {
   const navigate = useNavigate();
@@ -767,7 +768,7 @@ export default function ProfileScreen() {
                   <div key={video.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm relative group">
                     <div className="aspect-[9/16] bg-black flex items-center justify-center overflow-hidden">
                       <VideoPlayer
-                        src={video.video_url.startsWith("/static") ? `${API_BASE}${video.video_url}` : video.video_url}
+                        src={video.video_url.startsWith("/static") ? `${BASE_URL}${video.video_url}` : video.video_url}
                         className="w-full h-full"
                       />
                     </div>

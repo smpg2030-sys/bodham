@@ -18,6 +18,7 @@ const getApiBase = () => {
 };
 
 const API_BASE = getApiBase();
+const BASE_URL = API_BASE.endsWith("/api") ? API_BASE.slice(0, -4) : API_BASE;
 
 export default function HomeFeedScreen() {
   const navigate = useNavigate();
@@ -758,7 +759,7 @@ export default function HomeFeedScreen() {
 
                       <div className="aspect-[9/16] max-h-[600px] w-full bg-black shadow-inner">
                         <VideoPlayer
-                          src={item.video_url?.startsWith("/static") ? `${API_BASE}${item.video_url}` : (item.video_url || "")}
+                          src={item.video_url?.startsWith("/static") ? `${BASE_URL}${item.video_url}` : (item.video_url || "")}
                           className="h-full"
                         />
                       </div>

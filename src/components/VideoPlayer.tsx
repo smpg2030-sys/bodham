@@ -8,7 +8,7 @@ interface VideoPlayerProps {
     autoPlay?: boolean;
 }
 
-export default function VideoPlayer({ src, poster, className = "", autoPlay = false }: VideoPlayerProps) {
+export default function VideoPlayer({ src, poster, className = "" }: VideoPlayerProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(true); // Default to muted for reliable autoplay
@@ -92,26 +92,29 @@ export default function VideoPlayer({ src, poster, className = "", autoPlay = fa
     };
 
     useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.load();
+        }
+    }, [src]);
+
+    useEffect(() => {
         const options = {
             root: null,
-            rootMargin: '0px',
-            threshold: 0.4 // Trigger a bit earlier for smoother feel
+            rootMargin: '10px',
+            threshold: 0.2
         };
 
         const handleIntersection = (entries: IntersectionObserverEntry[]) => {
             entries.forEach(entry => {
                 if (videoRef.current) {
                     if (entry.isIntersecting) {
-                        // Use ref to track play promise and avoid "interrupted by pause" errors
                         playPromiseRef.current = videoRef.current.play();
                         if (playPromiseRef.current !== undefined) {
                             playPromiseRef.current.catch(err => {
-                                console.log("Smart Autoplay blocked or failed:", err);
+                                console.log("Autoplay check:", err.name);
                             });
                         }
                     } else {
-                        // Wait for play promise to settle before pausing if possible, 
-                        // or just pause (browsers usually handle this but can throw warnings)
                         if (playPromiseRef.current) {
                             playPromiseRef.current.then(() => {
                                 videoRef.current?.pause();
@@ -135,7 +138,7 @@ export default function VideoPlayer({ src, poster, className = "", autoPlay = fa
             if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
             observer.disconnect();
         };
-    }, []);
+    }, [src]);
 
     return (
         <div
@@ -148,16 +151,15 @@ export default function VideoPlayer({ src, poster, className = "", autoPlay = fa
                 src={src}
                 poster={poster}
                 className="w-full h-full object-cover"
-                autoPlay={autoPlay}
-                muted={isMuted}
+                muted={true}
                 loop
-                preload="metadata"
+                preload="auto"
+                playsInline
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={handleLoadedMetadata}
                 onClick={togglePlay}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
-                playsInline
             />
 
             <div
