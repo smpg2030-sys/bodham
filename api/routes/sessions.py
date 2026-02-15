@@ -197,3 +197,48 @@ def process_session_payment(room_id: str, user_id: str, amount: float):
     }
     db.session_payments.insert_one(payment_doc)
     return {"message": "Payment successful", "transactionId": payment_doc["transaction_id"]}
+
+@router.put("/rooms/{room_id}", response_model=RoomResponse)
+def update_room(room_id: str, room_update: RoomCreate, user_id: str):
+    db = get_db()
+    if db is None: raise HTTPException(status_code=503, detail="Database connection error")
+    
+    existing_room = db.rooms.find_one({"_id": ObjectId(room_id)})
+    if not existing_room: raise HTTPException(status_code=404, detail="Room not found")
+    
+    # Security: Verify ownership
+    if existing_room.get("host_id") != user_id:
+        raise HTTPException(status_code=403, detail="Unauthorized to edit this room")
+    
+    # Safety: Only upcoming rooms can be edited
+    if existing_room.get("status") != "upcoming":
+        raise HTTPException(status_code=400, detail="Only upcoming sessions can be modified")
+        
+    update_data = room_update.dict()
+    db.rooms.update_one({"_id": ObjectId(room_id)}, {"$set": update_data})
+    
+    updated_doc = db.rooms.find_one({"_id": ObjectId(room_id)})
+    updated_doc["id"] = str(updated_doc["_id"])
+    return updated_doc
+
+@router.delete("/rooms/{room_id}")
+def delete_room(room_id: str, user_id: str):
+    db = get_db()
+    if db is None: raise HTTPException(status_code=503, detail="Database connection error")
+    
+    existing_room = db.rooms.find_one({"_id": ObjectId(room_id)})
+    if not existing_room: raise HTTPException(status_code=404, detail="Room not found")
+    
+    # Security: Verify ownership (allow admin if needed, but user_id is the operator)
+    user = db.users.find_one({"_id": ObjectId(user_id)})
+    is_admin = user and user.get("role") == "admin"
+    
+    if existing_room.get("host_id") != user_id and not is_admin:
+        raise HTTPException(status_code=403, detail="Unauthorized to delete this room")
+    
+    # Safety: Only upcoming rooms can be deleted normally
+    if existing_room.get("status") != "upcoming" and not is_admin:
+         raise HTTPException(status_code=400, detail="Only upcoming sessions can be deleted")
+         
+    db.rooms.delete_one({"_id": ObjectId(room_id)})
+    return {"message": "Room deleted successfully"}

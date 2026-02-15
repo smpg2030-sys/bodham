@@ -22,21 +22,33 @@ export interface LiveRoom {
     access: "free" | "paid";
     price: number;
     scheduledAt: string;
+    scheduled_at?: string;
     duration: number; // in minutes
     status: "upcoming" | "live" | "ended";
     totalAttendees: number;
+    total_attendees?: number;
     totalRevenue: number;
+    total_revenue?: number;
     platformCommission: number;
+    platform_commission?: number;
     createdAt: string;
+    created_at?: string;
+    host_id?: string;
 }
 
 export interface SessionAttendance {
     roomId: string;
+    room_id?: string;
     userId: string;
+    user_id?: string;
     joinedAt: string;
+    joined_at?: string;
     leftAt?: string;
+    left_at?: string;
     stayDuration: number;
+    stay_duration?: number;
     paymentStatus: "paid" | "free";
+    payment_status?: "paid" | "free";
 }
 
 export interface SessionPayment {
