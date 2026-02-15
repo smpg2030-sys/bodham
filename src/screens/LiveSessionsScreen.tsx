@@ -72,7 +72,7 @@ export default function LiveSessionsScreen() {
                         <Sparkles className="w-6 h-6 text-indigo-500 fill-indigo-100" />
                         Live Rooms
                     </h1>
-                    {user?.role === "host" && user?.is_verified_host && (
+                    {(user?.role === "host" || user?.role === "admin") && user?.is_verified_host && (
                         <button
                             onClick={() => navigate("/sessions/host")}
                             className="text-xs font-bold px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-full border border-indigo-100 flex items-center gap-1.5"
