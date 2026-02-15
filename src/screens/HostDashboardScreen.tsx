@@ -23,7 +23,7 @@ export default function HostDashboardScreen() {
     const BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000/api" : "/api");
 
     useEffect(() => {
-        if (user?.role !== "host" || !user?.isVerifiedHost) {
+        if (user?.role !== "host" || !user?.is_verified_host) {
             navigate("/focus");
             return;
         }

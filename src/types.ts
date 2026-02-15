@@ -4,8 +4,8 @@ export interface User {
     full_name?: string | null;
     role?: string; // "user" | "host" | "admin"
     is_verified?: boolean;
-    isVerifiedHost?: boolean;
-    hostStatus?: "none" | "pending" | "approved" | "rejected";
+    is_verified_host?: boolean;
+    host_status?: "none" | "pending" | "approved" | "rejected";
     profile_pic?: string | null;
     bio?: string | null;
     mobile?: string | null;

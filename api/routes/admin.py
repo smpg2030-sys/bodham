@@ -37,6 +37,8 @@ def get_all_users(role: str | None = None):
             full_name=user.get("full_name") or None,
             role=user.get("role", "user"),
             is_verified=user.get("is_verified", False),
+            is_verified_host=user.get("is_verified_host", False),
+            host_status=user.get("host_status", "none"),
             profile_pic=user.get("profile_pic"),
             last_active_at=user.get("last_active_at")
         ))
@@ -55,11 +57,31 @@ def ban_user(user_id: str, ban_data: BanRequest, role: str):
         {"$set": {"role": "banned", "ban_reason": ban_data.reason}}
     )
     
-    # 2. Delete all their pending/approved posts? Or just ban user?
-    # Usually ban implies stopping future access. Content removal is separate or optional.
-    # We will just ban the user login for now.
-    
     return {"message": f"User {user_id} banned successfully"}
+
+@router.post("/users/{user_id}/verify-host")
+def toggle_host_verification(user_id: str, role: str):
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden: Admin access required")
+    
+    db = get_db()
+    user = db.users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    current_status = user.get("is_verified_host", False)
+    new_status = not current_status
+    
+    db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {
+            "is_verified_host": new_status,
+            "host_status": "approved" if new_status else "none",
+            "role": "host" if new_status else "user"
+        }}
+    )
+    
+    return {"message": f"User host verification set to {new_status}"}
 
 @router.delete("/posts/{post_id}")
 def admin_delete_post(post_id: str, role: str):

@@ -170,6 +170,19 @@ export default function AdminPanelScreen() {
     }
   };
 
+  const handleVerifyHost = async (userId: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/admin/users/${userId}/verify-host?role=${user?.role}`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        fetchData();
+      }
+    } catch (error) {
+      console.error("Error verifying host", error);
+    }
+  };
+
   const handleVideoModeration = async (videoId: string, status: "approved" | "rejected") => {
     let reason = "";
     if (status === "rejected") {
@@ -337,6 +350,16 @@ export default function AdminPanelScreen() {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleVerifyHost(u.id)}
+                      className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1.5 rounded-lg border transition-colors ${u.is_verified_host
+                          ? "bg-indigo-600 text-white border-indigo-600"
+                          : "bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-50"
+                        }`}
+                      title={u.is_verified_host ? "Revoke Host" : "Verify as Host"}
+                    >
+                      {u.is_verified_host ? "Verified Host" : "Verify Host"}
+                    </button>
                     <button
                       onClick={() => handleBanUser(u.id)}
                       className="text-slate-400 hover:text-red-500 p-1"
