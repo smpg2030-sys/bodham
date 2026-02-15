@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { LogOut, Settings, Shield, Trash2, MoreVertical, Grid, Bookmark, Camera, Video as VideoIcon, Users, UserPlus, CheckCircle2, Clock } from "lucide-react";
-import { Post, Video, AppFriend, User, JournalEntry } from "../types";
+import { User, Post, Video, FriendRequest, AppNotification, AppFriend } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
 import VideoPlayer from "../components/VideoPlayer";
 import GrowthTree from "../components/GrowthTree";
@@ -21,7 +21,7 @@ export default function ProfileScreen() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userId } = useParams();
-  const { user: currentUser, logout, setUser: setCurrentUser } = useAuth();
+  const { user: currentUser, logout, setUser: setCurrentUser, refreshUser } = useAuth();
 
   const isOwnProfile = !userId || userId === currentUser?.id;
   const targetUserId = userId || currentUser?.id;
@@ -44,7 +44,6 @@ export default function ProfileScreen() {
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [isSavingDetails, setIsSavingDetails] = useState(false);
-  const [calculatedStreak, setCalculatedStreak] = useState<number>(0);
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -115,68 +114,14 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (targetUserId) {
-      if (isOwnProfile) refreshUserRole();
+      if (isOwnProfile) refreshUser();
       fetchMyPosts();
       fetchMyVideos();
       fetchFriends();
-      fetchStreakData();
       if (!isOwnProfile) checkFriendship();
     }
   }, [targetUserId, isOwnProfile]);
 
-  const fetchStreakData = async () => {
-    if (!targetUserId) return;
-    try {
-      const res = await fetch(`${API_BASE}/journals/?user_id=${targetUserId}`);
-      if (res.ok) {
-        const entries: JournalEntry[] = await res.json();
-        const streak = calculateStreakFromJournals(entries);
-        setCalculatedStreak(streak);
-      }
-    } catch (err) {
-      console.error("Error fetching streak data", err);
-    }
-  };
-
-  const calculateStreakFromJournals = (entries: JournalEntry[]) => {
-    if (!entries || entries.length === 0) return 0;
-
-    // Get unique dates in YYYY-MM-DD format
-    const dates = new Set(entries.map(e => {
-      try {
-        return new Date(e.date).toISOString().split('T')[0];
-      } catch (e) {
-        return null;
-      }
-    }).filter(d => d !== null) as string[]);
-
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-
-    let streak = 0;
-    let currentCheckDate = "";
-
-    // If they journaled today, start from today. 
-    // If not, but they journaled yesterday, start from yesterday (streak still active).
-    // Otherwise, streak is 0.
-    if (dates.has(today)) {
-      currentCheckDate = today;
-    } else if (dates.has(yesterday)) {
-      currentCheckDate = yesterday;
-    } else {
-      return 0;
-    }
-
-    // Move backward day by day
-    while (dates.has(currentCheckDate)) {
-      streak++;
-      const dateObj = new Date(currentCheckDate);
-      dateObj.setDate(dateObj.getDate() - 1);
-      currentCheckDate = dateObj.toISOString().split('T')[0];
-    }
-
-    return streak;
-  };
 
   const checkFriendship = async () => {
     if (!currentUser || !userId) return;
@@ -204,18 +149,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const refreshUserRole = async () => {
-    if (!currentUser?.id) return;
-    try {
-      const res = await fetch(`${API_BASE}/auth/user/${currentUser.id}`);
-      if (res.ok) {
-        const freshUser = await res.json();
-        setCurrentUser(freshUser);
-      }
-    } catch (e) {
-      console.error("User refresh failed", e);
-    }
-  };
 
   const fetchMyPosts = async () => {
     if (!targetUserId) return;
@@ -633,7 +566,7 @@ export default function ProfileScreen() {
           <div className="mb-8">
             <GrowthTree
               createdAt={targetUser.created_at}
-              manualStreak={calculatedStreak}
+              manualStreak={targetUser.streak_count || 0}
             />
           </div>
         ) : (
@@ -659,7 +592,7 @@ export default function ProfileScreen() {
           </div>
           <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-4 rounded-2xl shadow-lg shadow-emerald-200 text-center text-white transform scale-105">
             <p className="text-2xl font-bold text-white">
-              {(isOwnProfile || friendshipStatus === "accepted") ? calculatedStreak : "—"}
+              {(isOwnProfile || friendshipStatus === "accepted") ? (targetUser.streak_count || 0) : "—"}
             </p>
             <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-wider mt-1">Streak</p>
           </div>

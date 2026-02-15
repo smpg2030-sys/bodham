@@ -26,7 +26,7 @@ const API_BASE = getApiBase();
 
 export default function JournalScreen() {
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, refreshUser } = useAuth();
     const [entries, setEntries] = useState<JournalEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
@@ -85,6 +85,7 @@ export default function JournalScreen() {
 
             if (res.ok) {
                 await fetchEntries();
+                refreshUser();
                 setIsEditing(false);
                 setCurrentEntry({ title: "", content: "", date: new Date().toISOString() });
             }

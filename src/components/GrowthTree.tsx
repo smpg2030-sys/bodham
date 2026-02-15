@@ -62,6 +62,12 @@ export default function GrowthTree({ createdAt, manualStreak, variant = "full", 
 
     const stage = getStage();
 
+    // Calculate leaf particles based on progress within current level
+    const nextMilestone = [3, 7, 14, 30, 60, 90, 365].find(m => m > days) || 365;
+    const prevMilestone = [0, 3, 7, 14, 30, 60, 90].reverse().find(m => m <= days) || 0;
+    const levelProgress = (days - prevMilestone) / (nextMilestone - prevMilestone);
+    const leafCount = Math.floor(levelProgress * 8) + 2;
+
     if (variant === "mini") {
         return (
             <motion.button
@@ -71,8 +77,9 @@ export default function GrowthTree({ createdAt, manualStreak, variant = "full", 
                 className={`relative flex items-center justify-center p-2 rounded-full bg-white dark:bg-gray-800 shadow-sm border border-slate-100 dark:border-gray-700 overflow-hidden group`}
             >
                 <div className={`absolute inset-0 bg-gradient-to-br ${stage.color} opacity-10 group-hover:opacity-20 transition-opacity`} />
-                <div className="relative z-10">
+                <div className="relative z-10 flex items-center gap-1.5">
                     {stage.icon}
+                    <span className="text-[10px] font-black text-slate-400">{days}</span>
                     {stage.effect && (
                         <motion.div
                             animate={{ rotate: 360 }}
@@ -90,6 +97,32 @@ export default function GrowthTree({ createdAt, manualStreak, variant = "full", 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden relative group">
             <div className={`absolute inset-0 bg-gradient-to-br ${stage.color} opacity-5 group-hover:opacity-10 transition-opacity duration-500`} />
+
+            {/* Granular Growth Particles */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                {Array.from({ length: leafCount }).map((_, i) => (
+                    <motion.div
+                        key={i}
+                        initial={{ opacity: 0, scale: 0 }}
+                        animate={{
+                            opacity: [0.2, 0.4, 0.2],
+                            scale: [0.5, 1, 0.5],
+                            y: [0, -20 - (i % 5) * 10, 0],
+                            x: [0, (i % 2 === 0 ? 30 : -30), 0]
+                        }}
+                        transition={{
+                            duration: 4 + (i % 3),
+                            repeat: Infinity,
+                            delay: i * 0.5,
+                            ease: "easeInOut"
+                        }}
+                        className="absolute bottom-1/4 left-1/2"
+                        style={{ marginLeft: -4, marginTop: -4 }}
+                    >
+                        <Leaf size={12} className="text-emerald-400/30" />
+                    </motion.div>
+                ))}
+            </div>
 
             <div className="relative flex flex-col items-center gap-6 text-center">
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
@@ -136,7 +169,7 @@ export default function GrowthTree({ createdAt, manualStreak, variant = "full", 
                         {stage.label}
                     </motion.p>
                     <p className="text-gray-500 dark:text-gray-400 font-medium">
-                        {stage.sub}
+                        {stage.sub} • {days} Day Streak
                     </p>
                 </div>
 

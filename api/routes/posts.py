@@ -99,6 +99,11 @@ def create_post(post: PostCreate, user_id: str, author_name: str, background_tas
              background_tasks.add_task(process_post_moderation, str(result.inserted_id))
     
     doc["id"] = str(result.inserted_id)
+
+    # Update Activity/Streak
+    from services.activity import update_last_active
+    update_last_active(user_id)
+
     return doc
 
 @router.get("/", response_model=list[PostResponse])

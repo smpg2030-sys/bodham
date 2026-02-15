@@ -38,6 +38,11 @@ def create_journal(entry: JournalEntryCreate, user_id: str):
     
     result = db.journals.insert_one(doc)
     doc["id"] = str(result.inserted_id)
+
+    # Update Activity/Streak
+    from services.activity import update_last_active
+    update_last_active(user_id)
+
     return doc
 
 @router.put("/{journal_id}", response_model=JournalEntryResponse)

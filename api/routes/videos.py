@@ -76,6 +76,11 @@ def create_video(video: VideoCreate):
     
     result = db.user_videos.insert_one(doc)
     doc["id"] = str(result.inserted_id)
+
+    # Update Activity/Streak
+    from services.activity import update_last_active
+    update_last_active(video.user_id)
+
     return doc
 
 @router.get("/my", response_model=list[VideoResponse])

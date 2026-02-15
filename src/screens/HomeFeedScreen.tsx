@@ -22,7 +22,7 @@ const BASE_URL = API_BASE.endsWith("/api") ? API_BASE.slice(0, -4) : API_BASE;
 
 export default function HomeFeedScreen() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("All Posts");
   const [showNewPost, setShowNewPost] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -50,13 +50,23 @@ export default function HomeFeedScreen() {
 
   const { refreshTrigger } = useHomeRefresh();
 
-  // Refresh feed when trigger changes
+  // Refresh user and feed when trigger changes or on mount
   useEffect(() => {
+    refreshUser();
     if (refreshTrigger > 0) {
       fetchData();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [refreshTrigger]);
+
+  useEffect(() => {
+    if (searchParams.get("create") === "true") {
+      setShowNewPost(true);
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete("create");
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (user && (!user.email || !user.full_name)) {
@@ -72,66 +82,10 @@ export default function HomeFeedScreen() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
-  const [calculatedStreak, setCalculatedStreak] = useState<number>(0);
 
   useEffect(() => {
-    if (user?.id) {
-      fetchStreakData();
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (searchParams.get("create") === "true") {
-      setShowNewPost(true);
-      // Remove the parameter after opening the modal
-      const newParams = new URLSearchParams(searchParams);
-      newParams.delete("create");
-      setSearchParams(newParams, { replace: true });
-    }
-  }, [searchParams]);
-
-  const fetchStreakData = async () => {
-    if (!user?.id) return;
-    try {
-      const res = await fetch(`${API_BASE}/journals/?user_id=${user.id}`);
-      if (res.ok) {
-        const entries: any[] = await res.json();
-        const streak = calculateStreakFromJournals(entries);
-        setCalculatedStreak(streak);
-      }
-    } catch (err) {
-      console.error("Error fetching streak data", err);
-    }
-  };
-
-  const calculateStreakFromJournals = (entries: any[]) => {
-    if (!entries || entries.length === 0) return 0;
-    const dates = new Set(entries.map(e => {
-      try {
-        return new Date(e.date).toISOString().split('T')[0];
-      } catch (e) {
-        return null;
-      }
-    }).filter(d => d !== null) as string[]);
-
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-
-    let streak = 0;
-    let currentCheckDate = "";
-
-    if (dates.has(today)) currentCheckDate = today;
-    else if (dates.has(yesterday)) currentCheckDate = yesterday;
-    else return 0;
-
-    while (dates.has(currentCheckDate)) {
-      streak++;
-      const dateObj = new Date(currentCheckDate);
-      dateObj.setDate(dateObj.getDate() - 1);
-      currentCheckDate = dateObj.toISOString().split('T')[0];
-    }
-    return streak;
-  };
+    fetchData(true);
+  }, []);
 
   // Centralized Video Intersection Observer
   useEffect(() => {
@@ -503,6 +457,7 @@ export default function HomeFeedScreen() {
       setImagePreview(null);
       setIsVideo(false);
       setShowNewPost(false);
+      refreshUser(); // Refresh user data to update streak
       fetchData(); // Refresh feed
     } catch (error: any) {
       console.error("Error creating post", error);
@@ -596,8 +551,7 @@ export default function HomeFeedScreen() {
           <GrowthTree
             variant="mini"
             createdAt={user?.created_at}
-            // Use the streak count from journals if user profile doesn't have it explicitly
-            manualStreak={calculatedStreak || 1}
+            manualStreak={user?.streak_count || 1}
             onClick={() => navigate("/profile")}
           />
           <button
