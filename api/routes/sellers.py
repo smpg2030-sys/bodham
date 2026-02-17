@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
+import bcrypt
 from bson import ObjectId
 from database import get_db
 from models import UserResponse, ProductCreate, ProductResponse
@@ -26,9 +27,13 @@ conf = ConnectionConfig(
 
 class SellerRegister(BaseModel):
     email: EmailStr
+    password: str
     full_name: str
     business_name: str | None = None
     phone_number: str | None = None
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 class SellerOTPVerify(BaseModel):
     email: EmailStr
@@ -46,6 +51,11 @@ async def register_seller(data: SellerRegister, background_tasks: BackgroundTask
     otp = generate_otp()
     expires_at = datetime.utcnow() + timedelta(minutes=5)
     
+    # Hash password before storing
+    registration_data = data.dict()
+    registration_data["password_hash"] = hash_password(data.password)
+    del registration_data["password"]
+
     # Store/Update registration intent
     db.seller_registrations.update_one(
         {"email": data.email},
@@ -53,7 +63,7 @@ async def register_seller(data: SellerRegister, background_tasks: BackgroundTask
             "otp": otp,
             "expires_at": expires_at,
             "attempts": 0,
-            "data": data.dict()
+            "data": registration_data
         }},
         upsert=True
     )
@@ -109,10 +119,15 @@ async def verify_seller_otp(data: SellerOTPVerify):
     }
     
     if user:
+        # Update existing user, but ONLY update password if it's not already set or if we want to allow re-registration to reset it
+        # Usually, if they register as seller, we expect them to know their password if they have an account.
+        # But for brand new sellers, we must set the password_hash.
+        update_doc["password_hash"] = seller_data["password_hash"]
         db.users.update_one({"_id": user["_id"]}, {"$set": update_doc})
     else:
         # Create new user if not exists
         update_doc["email"] = data.email
+        update_doc["password_hash"] = seller_data["password_hash"]
         update_doc["created_at"] = datetime.utcnow().isoformat()
         db.users.insert_one(update_doc)
     

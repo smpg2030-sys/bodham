@@ -13,13 +13,15 @@ const API_BASE = getApiBase();
 export default function SellerRegisterScreen() {
     const navigate = useNavigate();
     const [step, setStep] = useState<"details" | "otp" | "success">("details");
-    const [email, setEmail] = useState("");
     const [fullName, setFullName] = useState("");
     const [businessName, setBusinessName] = useState("");
     const [phoneNumber, setPhoneNumber] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
     const [otp, setOtp] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -29,7 +31,13 @@ export default function SellerRegisterScreen() {
             const res = await fetch(`${API_BASE}/sellers/register`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, full_name: fullName, business_name: businessName, phone_number: phoneNumber }),
+                body: JSON.stringify({
+                    email,
+                    password,
+                    full_name: fullName,
+                    business_name: businessName,
+                    phone_number: phoneNumber
+                }),
             });
             if (!res.ok) {
                 const data = await res.json();
@@ -113,6 +121,26 @@ export default function SellerRegisterScreen() {
                                         className="w-full px-5 py-3.5 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-violet-500 focus:bg-white outline-none transition-all text-slate-800 placeholder:text-slate-300 font-medium"
                                         placeholder="you@example.com"
                                     />
+                                </div>
+                                <div className="space-y-2 relative">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Password</label>
+                                    <div className="relative">
+                                        <input
+                                            required
+                                            type={showPassword ? "text" : "password"}
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            className="w-full px-5 py-3.5 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-violet-500 focus:bg-white outline-none transition-all text-slate-800 placeholder:text-slate-300 font-medium pr-12"
+                                            placeholder="••••••••"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-violet-500 transition-colors"
+                                        >
+                                            {showPassword ? "👁️" : "👁️‍🗨️"}
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Phone Number</label>
