@@ -11,8 +11,8 @@ async def get_marketplace():
     if db is None:
         raise HTTPException(status_code=503, detail="Database not available")
     
-    # 1. Identify approved sellers
-    approved_sellers_docs = list(db.users.find({"role": "seller", "seller_status": "approved"}))
+    # 1. Identify approved sellers (regardless of role)
+    approved_sellers_docs = list(db.users.find({"seller_status": "approved"}))
     approved_seller_ids = [str(u["_id"]) for u in approved_sellers_docs]
     
     # 2. Fetch active products from these sellers
