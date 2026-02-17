@@ -492,6 +492,59 @@ export default function AdminPanelScreen() {
             ))
           )}
         </div>
+      ) : activeTab === "sellers" ? (
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-black text-slate-800">Seller Applications</h2>
+            <div className="flex gap-2">
+              <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-black uppercase tracking-wider">Pending Review</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {sellers.filter(s => s.seller_status === "pending").map(seller => (
+              <div key={seller.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-slate-100 rounded-2xl overflow-hidden">
+                      {seller.profile_pic ? <img src={seller.profile_pic} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-xl uppercase">{seller.full_name?.charAt(0)}</div>}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">{seller.full_name}</h3>
+                      <p className="text-xs text-slate-400 font-medium">{seller.email}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-black text-violet-600 uppercase bg-violet-50 px-2 py-1 rounded-md">{seller.business_name || "No Business Name"}</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleSellerAction(seller.id, "approve")}
+                    className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-100"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => handleSellerAction(seller.id, "reject")}
+                    className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {sellers.filter(s => s.seller_status === "pending").length === 0 && (
+            <div className="text-center py-20 bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
+              <CheckCircle size={48} className="mx-auto text-emerald-300 mb-4" />
+              <h3 className="text-lg font-bold text-slate-800">No pending sellers</h3>
+              <p className="text-slate-400 text-sm">All caught up! Check the user list for existing sellers.</p>
+            </div>
+          )}
+        </div>
       ) : (
         <div className="space-y-4">
           {posts.length === 0 ? (
@@ -641,60 +694,6 @@ export default function AdminPanelScreen() {
                 )}
               </div>
             ))
-          )}
-        </div>
-      )}
-      {activeTab === "sellers" && (
-        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-black text-slate-800">Seller Applications</h2>
-            <div className="flex gap-2">
-              <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-black uppercase tracking-wider">Pending Review</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {sellers.filter(s => s.seller_status === "pending").map(seller => (
-              <div key={seller.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between gap-4 mb-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-slate-100 rounded-2xl overflow-hidden">
-                      {seller.profile_pic ? <img src={seller.profile_pic} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-xl uppercase">{seller.full_name?.charAt(0)}</div>}
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-800">{seller.full_name}</h3>
-                      <p className="text-xs text-slate-400 font-medium">{seller.email}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] font-black text-violet-600 uppercase bg-violet-50 px-2 py-1 rounded-md">{seller.business_name || "No Business Name"}</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleSellerAction(seller.id, "approve")}
-                    className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-100"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => handleSellerAction(seller.id, "reject")}
-                    className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors"
-                  >
-                    Reject
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {sellers.filter(s => s.seller_status === "pending").length === 0 && (
-            <div className="text-center py-20 bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
-              <CheckCircle size={48} className="mx-auto text-emerald-300 mb-4" />
-              <h3 className="text-lg font-bold text-slate-800">No pending sellers</h3>
-              <p className="text-slate-400 text-sm">All caught up! Check the user list for existing sellers.</p>
-            </div>
           )}
         </div>
       )}

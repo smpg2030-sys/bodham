@@ -53,7 +53,7 @@ def get_sellers(role: str, status: str = "all"):
     if role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     db = get_db()
-    query = {"role": "seller"}
+    query = {"seller_status": {"$ne": "none"}}
     if status != "all":
         query["seller_status"] = status
     
