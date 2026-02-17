@@ -18,6 +18,9 @@ import ArticleDetailScreen from "./screens/ArticleDetailScreen";
 import CommunityStoriesPreviewScreen from "./screens/CommunityStoriesPreviewScreen";
 import StoryDetailScreen from "./screens/StoryDetailScreen";
 import JournalScreen from "./screens/JournalScreen";
+import SellerRegisterScreen from "./screens/SellerRegisterScreen";
+import SellerDashboardScreen from "./screens/SellerDashboardScreen";
+import MarketplaceScreen from "./screens/MarketplaceScreen";
 import { AnimatePresence } from "framer-motion";
 import { useLocation } from "react-router-dom";
 
@@ -43,6 +46,8 @@ function AppRoutes() {
         <Route path="/goals" element={<GoalsScreen />} />
         <Route path="/login" element={<LoginRedirect />} />
         <Route path="/verify" element={<VerifyOTPScreen />} />
+        <Route path="/seller-register" element={<SellerRegisterScreen />} />
+        <Route path="/marketplace" element={<ProtectedRoute><MarketplaceScreen /></ProtectedRoute>} />
         <Route
           path="/community-stories"
           element={
@@ -107,6 +112,7 @@ function AppRoutes() {
           <Route path="sessions/:roomId" element={<SessionRoomScreen />} />
           <Route path="profile" element={<ProfileScreen />} />
           <Route path="profile/:userId" element={<ProfileScreen />} />
+          <Route path="seller/dashboard" element={<SellerDashboardScreen />} />
         </Route>
         <Route path="*" element={<Navigate to="/welcome" replace />} />
       </Routes>

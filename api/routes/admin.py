@@ -33,16 +33,76 @@ def get_all_users(role: str | None = None):
     for user in users_coll.find():
         all_users.append(UserResponse(
             id=str(user["_id"]),
-            email=user["email"],
+            email=user.get("email"),
+            mobile=user.get("mobile"),
             full_name=user.get("full_name") or None,
             role=user.get("role", "user"),
             is_verified=user.get("is_verified", False),
             is_verified_host=user.get("is_verified_host", False),
             host_status=user.get("host_status", "none"),
+            seller_status=user.get("seller_status", "none"),
+            business_name=user.get("business_name"),
             profile_pic=user.get("profile_pic"),
             last_active_at=user.get("last_active_at")
         ))
     return all_users
+
+
+@router.get("/sellers", response_model=List[UserResponse])
+def get_sellers(role: str, status: str = "all"):
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    db = get_db()
+    query = {"role": "seller"}
+    if status != "all":
+        query["seller_status"] = status
+    
+    cursor = db.users.find(query).sort("created_at", -1)
+    sellers = []
+    for s in cursor:
+        sellers.append(UserResponse(
+            id=str(s["_id"]),
+            email=s.get("email"),
+            mobile=s.get("mobile"),
+            full_name=s.get("full_name"),
+            role=s.get("role"),
+            is_verified=s.get("is_verified", False),
+            is_verified_host=s.get("is_verified_host", False),
+            host_status=s.get("host_status", "none"),
+            seller_status=s.get("seller_status", "none"),
+            business_name=s.get("business_name"),
+            profile_pic=s.get("profile_pic"),
+            last_active_at=s.get("last_active_at")
+        ))
+    return sellers
+
+
+@router.post("/sellers/{seller_id}/approve")
+def approve_seller(seller_id: str, role: str):
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    db = get_db()
+    try:
+        oid = ObjectId(seller_id)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid Seller ID")
+    
+    db.users.update_one({"_id": oid}, {"$set": {"seller_status": "approved"}})
+    return {"message": "Seller approved"}
+
+
+@router.post("/sellers/{seller_id}/reject")
+def reject_seller(seller_id: str, role: str):
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    db = get_db()
+    try:
+        oid = ObjectId(seller_id)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid Seller ID")
+    
+    db.users.update_one({"_id": oid}, {"$set": {"seller_status": "rejected"}})
+    return {"message": "Seller rejected"}
 
 @router.post("/users/{user_id}/ban")
 def ban_user(user_id: str, ban_data: BanRequest, role: str):

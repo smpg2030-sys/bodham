@@ -32,9 +32,11 @@ class UserResponse(BaseModel):
     mobile: str | None = None
     phone_number: str | None = None
     is_phone_verified: bool = False
-    role: str = "user" # "user", "host", "admin"
+    role: str = "user" # "user", "host", "admin", "seller"
     is_verified_host: bool = False
     host_status: str = "none" # "none", "pending", "approved", "rejected"
+    seller_status: str = "none" # "none", "pending", "approved", "rejected"
+    business_name: str | None = None
     full_name: str | None = None
     is_verified: bool = False
     profile_pic: str | None = None
@@ -163,4 +165,26 @@ class JournalEntryResponse(BaseModel):
     title: str | None = None
     content: str
     date: str
+    created_at: str
+
+
+class ProductCreate(BaseModel):
+    title: str
+    description: str
+    price: float
+    stock: int
+    images: list[str]
+    category: str | None = None
+
+
+class ProductResponse(BaseModel):
+    id: str
+    seller_id: str
+    seller_name: str | None = None
+    title: str
+    description: str
+    price: float
+    stock: int
+    images: list[str]
+    status: str = "active" # "active", "inactive"
     created_at: str

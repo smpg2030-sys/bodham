@@ -22,7 +22,8 @@ export default function AdminPanelScreen() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [stats, setStats] = useState({ total_users: 0, pending_moderation: 0, email_users: 0, mobile_users: 0, flagged_posts: 0 });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"users" | "pending" | "flagged" | "history" | "videos" | "sessions">("pending");
+  const [activeTab, setActiveTab] = useState<"users" | "pending" | "flagged" | "history" | "videos" | "sessions" | "sellers">("pending");
+  const [sellers, setSellers] = useState<User[]>([]);
   const [historyFilter, setHistoryFilter] = useState<"all" | "approved" | "rejected">("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
@@ -66,6 +67,9 @@ export default function AdminPanelScreen() {
       } else if (activeTab === "sessions") {
         const res = await fetch(`${API_BASE}/sessions/rooms?status=live`);
         if (res.ok) setPosts(await res.json()); // Repurposing posts state for rooms for simplicity in this view
+      } else if (activeTab === "sellers") {
+        const res = await fetch(`${API_BASE}/admin/sellers?role=${user.role}`);
+        if (res.ok) setSellers(await res.json());
       }
     } catch (err) {
       console.error("Failed to fetch admin data:", err);
@@ -167,6 +171,20 @@ export default function AdminPanelScreen() {
       }
     } catch (error) {
       console.error("Error banning user", error);
+    }
+  };
+
+  const handleSellerAction = async (sellerId: string, action: "approve" | "reject") => {
+    try {
+      const res = await fetch(`${API_BASE}/admin/sellers/${sellerId}/${action}?role=${user?.role}`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        setSellers(prev => prev.filter(s => s.id !== sellerId));
+        fetchData();
+      }
+    } catch (error) {
+      console.error("Seller action error", error);
     }
   };
 
@@ -280,12 +298,8 @@ export default function AdminPanelScreen() {
         >
           History
         </button>
-        <button
-          onClick={() => setActiveTab("sessions")}
-          className={`pb-2 px-4 font-medium text-sm whitespace-nowrap transition ${activeTab === "sessions" ? "border-b-2 border-indigo-500 text-indigo-600" : "text-slate-500"}`}
-        >
-          Sessions
-        </button>
+        <button onClick={() => setActiveTab("sessions")} className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === "sessions" ? "bg-violet-600 text-white shadow-lg shadow-violet-200" : "text-slate-500 hover:bg-slate-50"}`}>Sessions</button>
+        <button onClick={() => setActiveTab("sellers")} className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === "sellers" ? "bg-slate-900 text-white shadow-lg shadow-slate-200" : "text-slate-500 hover:bg-slate-50"}`}>👨‍💼 Sellers</button>
         <button
           onClick={() => setActiveTab("users")}
           className={`pb-2 px-4 font-medium text-sm whitespace-nowrap transition ${activeTab === "users" ? "border-b-2 border-green-500 text-green-600" : "text-slate-500"}`}
@@ -353,8 +367,8 @@ export default function AdminPanelScreen() {
                     <button
                       onClick={() => handleVerifyHost(u.id)}
                       className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1.5 rounded-lg border transition-colors ${u.is_verified_host
-                          ? "bg-indigo-600 text-white border-indigo-600"
-                          : "bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-50"
+                        ? "bg-indigo-600 text-white border-indigo-600"
+                        : "bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-50"
                         }`}
                       title={u.is_verified_host ? "Revoke Host" : "Verify as Host"}
                     >
@@ -627,6 +641,60 @@ export default function AdminPanelScreen() {
                 )}
               </div>
             ))
+          )}
+        </div>
+      )}
+      {activeTab === "sellers" && (
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-black text-slate-800">Seller Applications</h2>
+            <div className="flex gap-2">
+              <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-black uppercase tracking-wider">Pending Review</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {sellers.filter(s => s.seller_status === "pending").map(seller => (
+              <div key={seller.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-slate-100 rounded-2xl overflow-hidden">
+                      {seller.profile_pic ? <img src={seller.profile_pic} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-xl uppercase">{seller.full_name?.charAt(0)}</div>}
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">{seller.full_name}</h3>
+                      <p className="text-xs text-slate-400 font-medium">{seller.email}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-black text-violet-600 uppercase bg-violet-50 px-2 py-1 rounded-md">{seller.business_name || "No Business Name"}</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleSellerAction(seller.id, "approve")}
+                    className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-100"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => handleSellerAction(seller.id, "reject")}
+                    className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {sellers.filter(s => s.seller_status === "pending").length === 0 && (
+            <div className="text-center py-20 bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
+              <CheckCircle size={48} className="mx-auto text-emerald-300 mb-4" />
+              <h3 className="text-lg font-bold text-slate-800">No pending sellers</h3>
+              <p className="text-slate-400 text-sm">All caught up! Check the user list for existing sellers.</p>
+            </div>
           )}
         </div>
       )}

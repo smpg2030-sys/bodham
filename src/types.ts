@@ -6,6 +6,8 @@ export interface User {
     is_verified?: boolean;
     is_verified_host?: boolean;
     host_status?: "none" | "pending" | "approved" | "rejected";
+    seller_status?: "none" | "pending" | "approved" | "rejected";
+    business_name?: string | null;
     profile_pic?: string | null;
     bio?: string | null;
     mobile?: string | null;
@@ -156,5 +158,19 @@ export interface JournalEntry {
     title?: string;
     content: string;
     date: string;
+    created_at: string;
+}
+
+export interface Product {
+    id: string;
+    seller_id: string;
+    seller_name?: string;
+    title: string;
+    description: string;
+    price: number;
+    stock: number;
+    images: string[];
+    category?: string;
+    status: "active" | "inactive";
     created_at: string;
 }

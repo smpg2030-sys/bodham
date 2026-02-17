@@ -431,18 +431,25 @@ export default function LoginScreen() {
           </button>
         </form>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 text-center space-y-3">
           <button
             onClick={() => {
               setMessage(null);
-              setMode("login");
+              setMode(mode === "login" ? "register" : "login");
             }}
-            className="text-sm text-slate-600 hover:text-green-600 font-medium"
+            className="text-sm text-slate-600 hover:text-green-600 font-medium block w-full"
           >
-            {mode === "login"
-              ? <span onClick={(e) => { e.stopPropagation(); setMode("register"); }}>Don't have an account? Register</span>
-              : "Back to Sign in"}
+            {mode === "login" ? "Don't have an account? Register" : "Back to Sign in"}
           </button>
+
+          {mode === "login" && (
+            <button
+              onClick={() => navigate("/seller-register")}
+              className="w-full py-2.5 rounded-xl border-2 border-slate-100 text-slate-600 font-bold text-xs hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+            >
+              💼 Register as Seller
+            </button>
+          )}
         </div>
       </div>
     </div>

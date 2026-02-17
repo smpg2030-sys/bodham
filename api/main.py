@@ -12,6 +12,8 @@ from routes.upload import router as upload_router
 from routes.journals import router as journals_router
 from routes.sessions import router as sessions_router
 from routes.users import router as users_router
+from routes.sellers import router as sellers_router
+from routes.marketplace import router as marketplace_router
 
 app = FastAPI(title="MindRise API", version="1.0.0")
 
@@ -80,6 +82,8 @@ app.include_router(stories_router, prefix=prefix + "/community-stories")
 app.include_router(journals_router, prefix=prefix)
 app.include_router(sessions_router, prefix=prefix)
 app.include_router(users_router, prefix=prefix)
+app.include_router(sellers_router, prefix=prefix)
+app.include_router(marketplace_router, prefix=prefix)
 
 from routes.interactions import router as interactions_router
 app.include_router(interactions_router, prefix=prefix)
