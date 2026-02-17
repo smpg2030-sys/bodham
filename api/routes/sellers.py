@@ -94,8 +94,13 @@ async def verify_seller_otp(data: SellerOTPVerify):
     seller_data = reg_record["data"]
     user = db.users.find_one({"email": data.email})
     
+    # Preserve admin/host role if present, otherwise set to seller
+    new_role = "seller"
+    if user and user.get("role") in ["admin", "host"]:
+        new_role = user.get("role")
+
     update_doc = {
-        "role": "seller",
+        "role": new_role,
         "seller_status": "pending",
         "business_name": seller_data.get("business_name"),
         "full_name": seller_data.get("full_name"),
@@ -124,7 +129,10 @@ async def add_product(data: ProductCreate, seller_id: str):
         raise HTTPException(status_code=400, detail="Invalid Seller ID")
 
     user = db.users.find_one({"_id": oid})
-    if not user or user.get("role") != "seller" or user.get("seller_status") != "approved":
+    is_seller = user.get("role") == "seller" or user.get("role") in ["admin", "host"]
+    is_approved = user.get("seller_status") == "approved"
+
+    if not user or not is_seller or not is_approved:
         raise HTTPException(status_code=403, detail="Only approved sellers can post products")
     
     product_doc = data.dict()
