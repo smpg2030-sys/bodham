@@ -13,7 +13,7 @@ const getApiBase = () => {
 const API_BASE = getApiBase();
 
 export default function SellerDashboardScreen() {
-    const { user } = useAuth();
+    const { user, refreshUser } = useAuth();
     const navigate = useNavigate();
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
@@ -32,8 +32,9 @@ export default function SellerDashboardScreen() {
 
     useEffect(() => {
         if (!user) return;
-        if (user.role !== "seller" || user.seller_status !== "approved") {
-            // We'll show a message instead of just navigating away
+        if (user.seller_status !== "approved") {
+            // Check if we should refresh to see if status changed
+            refreshUser();
         } else {
             fetchProducts();
         }
@@ -92,7 +93,10 @@ export default function SellerDashboardScreen() {
         }
     };
 
-    if (!user || user.role !== "seller" || user.seller_status !== "approved") {
+    const isSeller = user?.role === "seller" || user?.role === "admin" || user?.role === "host";
+    const isApproved = user?.seller_status === "approved";
+
+    if (!user || !isSeller || !isApproved) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
                 <div className="max-w-md w-full bg-white p-10 rounded-3xl shadow-xl text-center">
