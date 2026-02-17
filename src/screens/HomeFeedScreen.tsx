@@ -1057,11 +1057,23 @@ export default function HomeFeedScreen() {
                 searchResults.map((u: any) => (
                   <div key={u.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold overflow-hidden">
+                      <div
+                        className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold overflow-hidden cursor-pointer"
+                        onClick={() => {
+                          setShowSearch(false);
+                          navigate(`/profile/${u.id}`);
+                        }}
+                      >
                         {u.profile_pic ? <img src={u.profile_pic} alt="" className="w-full h-full object-cover" /> : u.full_name?.[0] || u.email[0].toUpperCase()}
                       </div>
-                      <div>
-                        <p className="font-bold text-slate-800">{u.full_name || u.email.split("@")[0]}</p>
+                      <div
+                        className="cursor-pointer"
+                        onClick={() => {
+                          setShowSearch(false);
+                          navigate(`/profile/${u.id}`);
+                        }}
+                      >
+                        <p className="font-bold text-slate-800 hover:text-emerald-600 transition-colors">{u.full_name || u.email.split("@")[0]}</p>
                         <p className="text-xs text-slate-500">{u.role}</p>
                       </div>
                     </div>
@@ -1110,8 +1122,14 @@ export default function HomeFeedScreen() {
               ) : (
                 friendRequests.map((req: any) => (
                   <div key={req.request_id} className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-bold text-slate-800">{req.from_user_name}</p>
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => {
+                        setShowNotifications(false);
+                        navigate(`/profile/${req.from_user_id}`);
+                      }}
+                    >
+                      <p className="text-sm font-bold text-slate-800 hover:text-emerald-700 transition-colors">{req.from_user_name}</p>
                       <p className="text-xs text-slate-500">Sent a friend request</p>
                     </div>
                     <div className="flex gap-2">

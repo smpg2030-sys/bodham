@@ -12,7 +12,12 @@ import {
   UserPlus,
   CheckCircle2,
   Clock,
-  LogOut
+  LogOut,
+  Image as ImageIcon,
+  Heart,
+  MessageCircle,
+  X,
+  Play
 } from "lucide-react";
 import { User, Post, AppFriend } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -38,6 +43,9 @@ export default function ProfileScreen() {
   const [myPosts, setMyPosts] = useState<Post[]>([]);
   const [friendsList, setFriendsList] = useState<AppFriend[]>([]);
   const [friendshipStatus, setFriendshipStatus] = useState<"none" | "pending" | "received" | "accepted">("none");
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
 
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [isEditingBio, setIsEditingBio] = useState(false);
@@ -50,22 +58,25 @@ export default function ProfileScreen() {
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOwnProfile && currentUser) {
-      setTargetUser(currentUser);
-      setNewName(currentUser.full_name || "");
-      setNewEmail(currentUser.email || "");
-      setBioDraft(currentUser.bio || "");
-    } else if (userId) {
-      fetchTargetUser(userId);
+    if (targetUserId) {
+      fetchTargetUser(targetUserId);
+      if (isOwnProfile && currentUser) {
+        setNewName(currentUser.full_name || "");
+        setNewEmail(currentUser.email || "");
+        setBioDraft(currentUser.bio || "");
+      }
     }
-  }, [userId, currentUser, isOwnProfile]);
+  }, [targetUserId, currentUser, isOwnProfile]);
 
   const fetchTargetUser = async (id: string) => {
     try {
-      const res = await fetch(`${API_BASE}/auth/user/${id}`);
+      const res = await fetch(`${API_BASE}/users/${id}?current_user_id=${currentUser?.id || ""}`);
       if (res.ok) {
         const data = await res.json();
-        setTargetUser(data);
+        setTargetUser(data.userData);
+        setMyPosts(data.posts);
+        setFollowersCount(data.followersCount || 0);
+        setFollowingCount(data.followingCount || 0);
       }
     } catch (e) {
       console.error("Failed to fetch target user", e);
@@ -115,8 +126,12 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (targetUserId) {
-      if (isOwnProfile) refreshUser();
-      fetchMyPosts();
+      if (isOwnProfile) {
+        refreshUser();
+        fetchMyPosts(); // Still need to fetch posts if it's own profile and we want the non-aggregated way for now or just unify it
+      } else {
+        fetchTargetUser(targetUserId);
+      }
       fetchFriends();
       if (!isOwnProfile) checkFriendship();
     }
@@ -419,14 +434,25 @@ export default function ProfileScreen() {
       className="w-full"
     >
       <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl px-4 py-4 flex items-center justify-between border-b border-slate-100/50 shadow-sm">
-        <button
-          type="button"
-          onClick={() => setShowSettings(true)}
-          className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
-          aria-label="Settings"
-        >
-          <Settings className="w-5 h-5" />
-        </button>
+        {isOwnProfile && (
+          <button
+            type="button"
+            onClick={() => setShowSettings(true)}
+            className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+            aria-label="Settings"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+        )}
+        {!isOwnProfile && (
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+          >
+            ←
+          </button>
+        )}
         <h1 className="text-lg font-bold text-slate-800 tracking-tight">Profile</h1>
         <button
           type="button"
@@ -573,14 +599,12 @@ export default function ProfileScreen() {
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Posts</p>
           </div>
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 text-center">
-            <p className="text-2xl font-bold text-slate-800">{friendsList.length}</p>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Friends</p>
+            <p className="text-2xl font-bold text-slate-800">{followersCount}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Followers</p>
           </div>
-          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-4 rounded-2xl shadow-lg shadow-emerald-200 text-center text-white">
-            <p className="text-2xl font-bold text-white">
-              {(isOwnProfile || friendshipStatus === "accepted") ? (targetUser.streak_count || 0) : "—"}
-            </p>
-            <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-wider mt-1">Streak</p>
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 text-center">
+            <p className="text-2xl font-bold text-slate-800">{followingCount}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Following</p>
           </div>
         </div>
 
@@ -656,7 +680,38 @@ export default function ProfileScreen() {
                   <p className="text-slate-900 font-bold mb-1">No posts yet</p>
                   <p className="text-slate-500 text-sm">Valid posts you create will appear here.</p>
                 </div>
+              ) : !isOwnProfile ? (
+                /* Grid Layout for Visitors */
+                <div className="grid grid-cols-3 gap-1">
+                  {myPosts.map((post) => (
+                    <div
+                      key={post.id}
+                      className="aspect-square relative bg-slate-200 cursor-pointer overflow-hidden group"
+                      onClick={() => setSelectedPost(post)}
+                    >
+                      {post.image_url ? (
+                        <img src={post.image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      ) : post.video_url ? (
+                        <div className="w-full h-full relative">
+                          <video src={post.video_url} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                            <Play className="w-8 h-8 text-white opacity-80" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center p-2 bg-slate-100 text-[10px] text-slate-500 overflow-hidden leading-tight italic">
+                          {post.content}
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-white font-bold text-sm">
+                        <span className="flex items-center gap-1"><Heart className="w-4 h-4 fill-white" /> {post.likes_count}</span>
+                        <span className="flex items-center gap-1"><MessageCircle className="w-4 h-4 fill-white" /> {post.comments_count}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
+                /* Card Layout for Owner (to allow easy management) */
                 myPosts.map((post, index) => (
                   <motion.div
                     key={post.id}
@@ -745,17 +800,19 @@ export default function ProfileScreen() {
           )}
         </AnimatePresence>
 
-        <motion.button
-          whileTap={{ scale: 0.98 }}
-          onClick={() => {
-            logout();
-            navigate("/login", { replace: true });
-          }}
-          className="w-full mt-8 py-3.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 mb-8"
-        >
-          <LogOut className="w-4 h-4" />
-          Log out
-        </motion.button>
+        {isOwnProfile && (
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => {
+              logout();
+              navigate("/login", { replace: true });
+            }}
+            className="w-full mt-8 py-3.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 mb-8"
+          >
+            <LogOut className="w-4 h-4" />
+            Log out
+          </motion.button>
+        )}
       </div>
 
       <AnimatePresence>
@@ -868,6 +925,92 @@ export default function ProfileScreen() {
                   {isSavingDetails ? "Saving..." : "Save Changes"}
                 </button>
               </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {selectedPost && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 sm:p-8"
+            onClick={() => setSelectedPost(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-white w-full max-w-4xl max-h-[90vh] rounded-3xl overflow-hidden flex flex-col md:flex-row shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Media Section */}
+              <div className="md:w-3/5 bg-slate-900 flex items-center justify-center relative min-h-[300px]">
+                {selectedPost.image_url ? (
+                  <img src={selectedPost.image_url} alt="" className="max-w-full max-h-full object-contain" />
+                ) : selectedPost.video_url ? (
+                  <video src={selectedPost.video_url} controls autoPlay className="max-w-full max-h-full" />
+                ) : (
+                  <div className="p-12 text-white text-xl italic text-center font-serif leading-relaxed">
+                    "{selectedPost.content}"
+                  </div>
+                )}
+                <button
+                  onClick={() => setSelectedPost(null)}
+                  className="absolute top-4 left-4 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center md:hidden"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Interaction Section */}
+              <div className="md:w-2/5 flex flex-col h-full bg-white">
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 overflow-hidden shadow-sm">
+                      {targetUser.profile_pic ? (
+                        <img src={targetUser.profile_pic} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold">
+                          {targetUser.full_name?.[0] || targetUser.email[0].toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <span className="font-bold text-slate-800 text-sm">{targetUser.full_name || targetUser.email.split("@")[0]}</span>
+                  </div>
+                  <button
+                    onClick={() => setSelectedPost(null)}
+                    className="p-2 text-slate-400 hover:text-slate-600 hidden md:block"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[200px] md:min-h-0">
+                  <p className="text-slate-800 text-sm whitespace-pre-wrap">{selectedPost.content}</p>
+                  <div className="pt-4 border-t border-slate-50">
+                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-4">Comments</p>
+                    {/* Comments would go here or just use PostCard inside modal but that's heavy */}
+                    <p className="text-xs text-slate-400 italic">Comments are visible in the main feed card view.</p>
+                  </div>
+                </div>
+
+                <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-4">
+                      <button onClick={() => handleLikeToggle(selectedPost.id)} className="hover:scale-110 transition-transform">
+                        <Heart className={`w-6 h-6 ${selectedPost.is_liked_by_me ? 'fill-rose-500 text-rose-500' : 'text-slate-600'}`} />
+                      </button>
+                      <button className="hover:scale-110 transition-transform">
+                        <MessageCircle className="w-6 h-6 text-slate-600" />
+                      </button>
+                    </div>
+                    <span className="text-xs text-slate-400">{new Date(selectedPost.created_at).toLocaleDateString()}</span>
+                  </div>
+                  <p className="font-bold text-slate-800 text-sm">{selectedPost.likes_count} likes</p>
+                </div>
+              </div>
             </motion.div>
           </motion.div>
         )}

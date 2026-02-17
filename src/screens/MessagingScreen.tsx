@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, User } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -13,6 +14,7 @@ interface Convo {
 }
 
 export default function MessagingScreen() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [friends, setFriends] = useState<Convo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,16 +74,23 @@ export default function MessagingScreen() {
             <img
               src={selectedChat.profile_pic}
               alt={selectedChat.name}
-              className="w-10 h-10 rounded-full object-cover"
+              className="w-10 h-10 rounded-full object-cover cursor-pointer"
+              onClick={() => navigate(`/profile/${selectedChat.id}`)}
             />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+            <div
+              className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center cursor-pointer"
+              onClick={() => navigate(`/profile/${selectedChat.id}`)}
+            >
               <User className="w-6 h-6 text-amber-600" />
             </div>
           )}
 
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-slate-800 truncate">{selectedChat.name}</p>
+          <div
+            className="flex-1 min-w-0 cursor-pointer"
+            onClick={() => navigate(`/profile/${selectedChat.id}`)}
+          >
+            <p className="font-semibold text-slate-800 truncate hover:text-green-600 transition-colors uppercase tracking-tight">{selectedChat.name}</p>
             <p className={`text-xs ${isOnline(selectedChat.last_active_at) ? 'text-green-500' : 'text-slate-400'}`}>
               {isOnline(selectedChat.last_active_at) ? 'Online' : 'Offline'}
             </p>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Heart, MessageCircle, Send, Trash2 } from "lucide-react";
 import { Post, Comment } from "../types";
 import VideoPlayer from "./VideoPlayer";
@@ -13,6 +14,7 @@ interface PostCardProps {
 }
 
 export default function PostCard({ post, currentUserId, activeVideoId, onLikeToggle, onCommentSubmit, onDelete }: PostCardProps) {
+    const navigate = useNavigate();
     const [commentText, setCommentText] = useState("");
     const [showComments, setShowComments] = useState(false);
     const [comments, setComments] = useState<Comment[]>([]);
@@ -55,7 +57,10 @@ export default function PostCard({ post, currentUserId, activeVideoId, onLikeTog
             {/* Header */}
             <div className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                        className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden cursor-pointer"
+                        onClick={() => navigate(`/profile/${post.user_id}`)}
+                    >
                         {post.author_profile_pic ? (
                             <img src={post.author_profile_pic} alt={post.author_name} className="w-full h-full object-cover" />
                         ) : (
@@ -65,7 +70,12 @@ export default function PostCard({ post, currentUserId, activeVideoId, onLikeTog
                         )}
                     </div>
                     <div>
-                        <h3 className="font-bold text-slate-800">{post.author_name}</h3>
+                        <h3
+                            className="font-bold text-slate-800 cursor-pointer hover:text-violet-600 transition-colors"
+                            onClick={() => navigate(`/profile/${post.user_id}`)}
+                        >
+                            {post.author_name}
+                        </h3>
                         <p className="text-xs text-slate-500">{new Date(post.created_at).toLocaleDateString()}</p>
                     </div>
                 </div>
@@ -136,7 +146,10 @@ export default function PostCard({ post, currentUserId, activeVideoId, onLikeTog
                         <div className="space-y-4 mb-4">
                             {comments.map((comment) => (
                                 <div key={comment.id} className="flex gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-white border border-slate-200 overflow-hidden flex-shrink-0">
+                                    <div
+                                        className="w-8 h-8 rounded-full bg-white border border-slate-200 overflow-hidden flex-shrink-0 cursor-pointer"
+                                        onClick={() => navigate(`/profile/${comment.user_id}`)}
+                                    >
                                         {comment.author_profile_pic ? (
                                             <img src={comment.author_profile_pic} alt={comment.author_name} className="w-full h-full object-cover" />
                                         ) : (
@@ -147,7 +160,12 @@ export default function PostCard({ post, currentUserId, activeVideoId, onLikeTog
                                     </div>
                                     <div className="flex-1 bg-white p-3 rounded-2xl rounded-tl-none shadow-sm text-sm">
                                         <div className="flex justify-between items-baseline mb-1">
-                                            <span className="font-bold text-slate-700">{comment.author_name}</span>
+                                            <span
+                                                className="font-bold text-slate-700 cursor-pointer hover:text-violet-600 transition-colors"
+                                                onClick={() => navigate(`/profile/${comment.user_id}`)}
+                                            >
+                                                {comment.author_name}
+                                            </span>
                                             <span className="text-[10px] text-slate-400">{new Date(comment.created_at).toLocaleDateString()}</span>
                                         </div>
                                         <p className="text-slate-600">{comment.content}</p>
