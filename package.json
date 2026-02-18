@@ -13,11 +13,13 @@
     "@capacitor/cli": "^5.7.8",
     "@capacitor/core": "^5.7.8",
     "@radix-ui/react-dialog": "^1.0.5",
+    "@tanstack/react-query": "^5.90.21",
     "framer-motion": "^11.0.0",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0",
+    "react-virtuoso": "^4.18.1",
     "sonner": "^1.4.0",
     "vaul": "^0.9.0"
   },

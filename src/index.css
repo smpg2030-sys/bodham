@@ -120,3 +120,28 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Skeleton Shimmer Animation */
+@keyframes shimmer {
+  0% {
+    background-position: -468px 0;
+  }
+
+  100% {
+    background-position: 468px 0;
+  }
+}
+
+.animate-shimmer {
+  background: #f1f5f9;
+  background-image: linear-gradient(to right,
+      #f1f5f9 0%,
+      #e2e8f0 20%,
+      #f1f5f9 40%,
+      #f1f5f9 100%);
+  background-repeat: no-repeat;
+  background-size: 800px 104px;
+  display: inline-block;
+  position: relative;
+  animation: shimmer 1.5s linear infinite forwards;
+}

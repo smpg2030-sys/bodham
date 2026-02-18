@@ -1,13 +1,16 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Search, Plus, Bell, Image as ImageIcon, Video as VideoIcon, Camera, ArrowLeft, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useHomeRefresh } from "../context/HomeRefreshContext";
-import { Post, FriendRequest, AppNotification, CommunityStory } from "../types";
+import { FriendRequest, AppNotification } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Virtuoso } from "react-virtuoso";
 import VideoPlayer from "../components/VideoPlayer";
 import GrowthTree from "../components/GrowthTree";
 import PostCard from "../components/PostCard";
+import PostSkeleton from "../components/PostSkeleton";
 
 const TABS = ["All Posts", "Stories", "Daily Quotes", "Gratitude"] as const;
 
@@ -37,8 +40,6 @@ export default function HomeFeedScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchingUsers, setSearchingUsers] = useState(false);
-  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileBanner, setShowProfileBanner] = useState(false);
   const [showFullProfilePic, setShowFullProfilePic] = useState(false);
@@ -49,12 +50,78 @@ export default function HomeFeedScreen() {
   const pressStartTime = useRef<number>(0);
 
   const { refreshTrigger } = useHomeRefresh();
+  const queryClient = useQueryClient();
+
+  // Queries
+  const {
+    data: feedData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: isFeedLoading,
+    refetch: refetchFeed
+  } = useInfiniteQuery({
+    queryKey: ["feed", activeTab],
+    queryFn: async ({ pageParam = 0 }) => {
+      const pParam = pageParam as number;
+      if (activeTab !== "All Posts") {
+        const res = await fetch(`${API_BASE}/community-stories/`);
+        if (!res.ok) throw new Error("Failed to fetch stories");
+        return { items: await res.json(), nextCursor: null };
+      }
+
+      const skip = pParam * 15;
+      const [postsRes, videosRes] = await Promise.all([
+        fetch(`${API_BASE}/posts/?user_id=${user?.id || ""}&limit=15&skip=${skip}`),
+        fetch(`${API_BASE}/videos/?limit=5&skip=${pParam * 5}`)
+      ]);
+
+      let items: any[] = [];
+      if (postsRes.ok) items = [...items, ...(await postsRes.json())];
+      if (videosRes.ok) items = [...items, ...(await videosRes.json())];
+
+      items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      return {
+        items,
+        nextCursor: items.length >= 10 ? pParam + 1 : null
+      };
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    initialPageParam: 0,
+    enabled: !!user
+  });
+
+  const { data: friendRequests = [], refetch: refetchFriendRequests } = useQuery({
+    queryKey: ["friendRequests", user?.id],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/friends/requests?user_id=${user?.id}`);
+      if (!res.ok) throw new Error("Failed to fetch friend requests");
+      return res.json() as Promise<FriendRequest[]>;
+    },
+    enabled: !!user,
+    refetchInterval: 30000
+  });
+
+  const { data: notifications = [], refetch: _refetchNotifications } = useQuery({
+    queryKey: ["notifications", user?.id],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/friends/notifications?user_id=${user?.id}`);
+      if (!res.ok) throw new Error("Failed to fetch notifications");
+      return res.json() as Promise<AppNotification[]>;
+    },
+    enabled: !!user,
+    refetchInterval: 30000
+  });
+
+  // Flattened posts for rendering
+  const allPosts = useMemo(() => feedData?.pages.flatMap(page => page.items) || [], [feedData]);
 
   // Refresh user and feed when trigger changes or on mount
   useEffect(() => {
     refreshUser();
     if (refreshTrigger > 0) {
-      fetchData();
+      refetchFeed();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [refreshTrigger]);
@@ -76,16 +143,7 @@ export default function HomeFeedScreen() {
     }
   }, [user]);
 
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [communityStories, setCommunityStories] = useState<CommunityStory[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchData(true);
-  }, []);
 
   // Centralized Video Intersection Observer
   useEffect(() => {
@@ -122,159 +180,90 @@ export default function HomeFeedScreen() {
     videoElements.forEach(el => observer.observe(el));
 
     return () => observer.disconnect();
-  }, [posts, activeTab]); // Re-observe when feed changes
+  }, [allPosts, activeTab]); // Re-observe when feed changes
 
-  const fetchData = async (reset = false) => {
-    if (loading) return;
+  // Mutations
+  const likeMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const res = await fetch(`${API_BASE}/posts/${postId}/like`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user?.id })
+      });
+      if (!res.ok) throw new Error("Failed to like");
+      return res.json();
+    },
+    onMutate: async (postId) => {
+      await queryClient.cancelQueries({ queryKey: ["feed"] });
+      const previousFeed = queryClient.getQueryData(["feed", activeTab]);
 
-    // If not All Posts, pagination logic is skipped for now for simplicity
-    if (activeTab !== "All Posts") {
-      setLoading(true);
-      try {
-        const res = await fetch(`${API_BASE}/community-stories/`);
-        if (res.ok) {
-          const data = await res.json();
-          setCommunityStories(Array.isArray(data) ? data : []);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
+      queryClient.setQueryData(["feed", activeTab], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            items: page.items.map((p: any) => {
+              if (p.id === postId) {
+                const isLiked = !!p.is_liked_by_me;
+                return {
+                  ...p,
+                  likes_count: isLiked ? Math.max(0, (p.likes_count || 0) - 1) : (p.likes_count || 0) + 1,
+                  is_liked_by_me: !isLiked
+                };
+              }
+              return p;
+            })
+          }))
+        };
+      });
+      return { previousFeed };
+    },
+    onError: (_err, _postId, context) => {
+      if (context?.previousFeed) {
+        queryClient.setQueryData(["feed", activeTab], context.previousFeed);
       }
-      return;
     }
+  });
 
-    setLoading(true);
-    const currentPage = reset ? 0 : page;
-    const skip = currentPage * 15;
-
-    try {
-      const postsUrl = `${API_BASE}/posts/?user_id=${user?.id || ""}&limit=15&skip=${skip}`;
-      const videosUrl = `${API_BASE}/videos/?limit=5&skip=${currentPage * 5}`;
-
-      const [postsRes, videosRes] = await Promise.all([
-        fetch(postsUrl),
-        fetch(videosUrl)
-      ]);
-
-      let newItems: any[] = [];
-      if (postsRes.ok) {
-        const data = await postsRes.json();
-        if (Array.isArray(data)) newItems = [...newItems, ...data];
-      }
-      if (videosRes.ok) {
-        const data = await videosRes.json();
-        if (Array.isArray(data)) newItems = [...newItems, ...data];
-      }
-
-      // Sort combined in memory
-      newItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-      if (reset) {
-        setPosts(newItems);
-        setPage(1);
-      } else {
-        setPosts(prev => [...prev, ...newItems]);
-        setPage(prev => prev + 1);
-      }
-
-      // If we got fewer than expected, assume no more
-      if (newItems.length < 10) {
-        setHasMore(false);
-      } else {
-        setHasMore(true);
-      }
-    } catch (error) {
-      console.error("Error fetching feed:", error);
-    } finally {
-      setLoading(false);
+  const reportMutation = useMutation({
+    mutationFn: async ({ id, type }: { id: string, type: 'post' | 'video' }) => {
+      const endpoint = type === 'post' ? `/posts/${id}/report` : `/videos/${id}/report`;
+      const res = await fetch(`${API_BASE}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user?.id })
+      });
+      if (!res.ok) throw new Error("Failed to report");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.setQueryData(["feed", activeTab], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            items: page.items.filter((p: any) => p.id !== variables.id)
+          }))
+        };
+      });
+      setSubmissionFeedback({ type: 'success', message: `${variables.type === 'post' ? 'Post' : 'Video'} reported and removed. Thank you for keeping Bodham safe!` });
+      setTimeout(() => setSubmissionFeedback(null), 3000);
     }
-  };
+  });
 
-  const fetchFriendRequests = async () => {
-    if (!user) return;
-    try {
-      const res = await fetch(`${API_BASE}/friends/requests?user_id=${user.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setFriendRequests(data);
-      }
-    } catch (err) {
-      console.error("Error fetching friend requests:", err);
-    }
-  };
-
-  const handleReportPost = async (postId: string) => {
+  const handleReportPost = (postId: string) => {
     if (!user) return;
     if (!window.confirm("Are you sure you want to report this post for violating guidelines? This will automatically remove it from the community for review.")) return;
-
-    try {
-      const res = await fetch(`${API_BASE}/posts/${postId}/report`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id }),
-      });
-
-      if (res.ok) {
-        setPosts(prev => prev.filter(p => (p as any).id !== postId));
-        setSubmissionFeedback({ type: 'success', message: 'Post reported and removed. Thank you for keeping Bodham safe!' });
-        setTimeout(() => setSubmissionFeedback(null), 3000);
-      }
-    } catch (err) {
-      console.error("Failed to report post", err);
-    }
+    reportMutation.mutate({ id: postId, type: 'post' });
   };
 
-  const handleReportVideo = async (videoId: string) => {
+  const handleReportVideo = (videoId: string) => {
     if (!user) return;
     if (!window.confirm("Are you sure you want to report this video for violating guidelines? This will automatically remove it from the community for review.")) return;
-
-    try {
-      const res = await fetch(`${API_BASE}/videos/${videoId}/report`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id }),
-      });
-
-      if (res.ok) {
-        setPosts(prev => prev.filter(p => (p as any).id !== videoId));
-        setSubmissionFeedback({ type: 'success', message: 'Video reported and removed. Thank you for keeping Bodham safe!' });
-        setTimeout(() => setSubmissionFeedback(null), 3000);
-      }
-    } catch (err) {
-      console.error("Failed to report video", err);
-    }
+    reportMutation.mutate({ id: videoId, type: 'video' });
   };
-
-  const fetchNotifications = async () => {
-    if (!user) return;
-    try {
-      const res = await fetch(`${API_BASE}/friends/notifications?user_id=${user.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications(data);
-      }
-    } catch (err) {
-      console.error("Error fetching notifications:", err);
-    }
-  };
-
-  useEffect(() => {
-    fetchData(true);
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (user) {
-      fetchFriendRequests();
-      fetchNotifications();
-      // Setup polling or socket for notifications/requests
-      const interval = setInterval(() => {
-        fetchFriendRequests();
-        fetchNotifications();
-      }, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [user]);
 
   // Unified Polling & Progress Animation
   useEffect(() => {
@@ -320,7 +309,7 @@ export default function HomeFeedScreen() {
               });
 
               if (isApproved) {
-                setTimeout(() => fetchData(), 500);
+                setTimeout(() => refetchFeed(), 500);
               }
 
               // Auto-hide popup after 5 seconds
@@ -336,45 +325,9 @@ export default function HomeFeedScreen() {
     return () => clearInterval(mainInterval);
   }, [pendingItem?.id, pendingItem?.status]);
 
-  const handleLikeToggle = async (postId: string) => {
+  const handleLikeToggle = (postId: string) => {
     if (!user) return;
-    try {
-      // Optimistic update
-      setPosts(prev => prev.map(p => {
-        if (p.id === postId) {
-          // It might be a video item which we are not using PostCard for yet, or a post item.
-          // PostCard expects standard Post fields.
-          // If it is a video, we might not have 'likes_count' on it yet if we didn't update types/backend for videos?
-          // The backend update was for 'db.posts' and 'PostResponse'.
-          // Videos are in 'db.videos'.
-          // My backfill script only updated 'posts' and 'pending_posts'.
-          // Videos might be missing these fields.
-          // But 'posts' state here mixes them.
-          // Safely check fields.
-          const currentLikes = p.likes_count || 0;
-          const isLiked = !!p.is_liked_by_me;
-          return {
-            ...p,
-            likes_count: isLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1,
-            is_liked_by_me: !isLiked
-          };
-        }
-        return p;
-      }));
-
-      const res = await fetch(`${API_BASE}/posts/${postId}/like`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id })
-      });
-
-      if (!res.ok) {
-        // Revert if failed (simplified: just fetch data again or ignore for now)
-        console.error("Like toggle failed on server");
-      }
-    } catch (error) {
-      console.error("Like toggle failed", error);
-    }
+    likeMutation.mutate(postId);
   };
 
   const handleCommentSubmit = async (postId: string, content: string) => {
@@ -386,15 +339,7 @@ export default function HomeFeedScreen() {
         body: JSON.stringify({ user_id: user.id, content })
       });
       if (res.ok) {
-        setPosts(prev => prev.map(p => {
-          if (p.id === postId) {
-            return {
-              ...p,
-              comments_count: (p.comments_count || 0) + 1
-            };
-          }
-          return p;
-        }));
+        queryClient.invalidateQueries({ queryKey: ["feed"] });
       }
     } catch (error) {
       console.error("Comment submit failed", error);
@@ -500,7 +445,7 @@ export default function HomeFeedScreen() {
       setIsVideo(false);
       setShowNewPost(false);
       refreshUser(); // Refresh user data to update streak
-      fetchData(); // Refresh feed
+      queryClient.invalidateQueries({ queryKey: ["feed"] });
     } catch (error: any) {
       console.error("Error creating post", error);
       setSubmissionFeedback({
@@ -703,154 +648,120 @@ export default function HomeFeedScreen() {
             </motion.div>
           )}
         </AnimatePresence>
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-12 space-y-4">
-            <div className="w-8 h-8 border-4 border-emerald-100 border-t-emerald-500 rounded-full animate-spin"></div>
-            <p className="text-slate-400 font-medium">Loading feed...</p>
-          </div>
-        ) : activeTab === "Stories" ? (
+        {isFeedLoading && allPosts.length === 0 ? (
           <div className="grid grid-cols-1 gap-6">
-            {communityStories.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <ImageIcon className="w-16 h-16 text-slate-200 mb-4" />
-                <p className="text-xl font-bold text-slate-700">No stories available</p>
-              </div>
-            ) : (
-              communityStories.map((story, index) => (
-                <motion.div
-                  key={story.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 group transition hover:shadow-md"
-                >
-                  <div className="aspect-video bg-slate-100 relative overflow-hidden">
-                    {story.image_url ? (
-                      <img
-                        src={story.image_url}
-                        alt={story.title}
-                        className="w-full h-full object-cover transition duration-500 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-4xl">📰</div>
-                    )}
-                    <div className="absolute top-4 left-4">
-                      <span className="bg-emerald-600 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg uppercase tracking-wider">
-                        Community
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <h2 className="text-xl font-bold text-slate-800 mb-2 leading-tight group-hover:text-emerald-600 transition">
-                      {story.title}
-                    </h2>
-                    <p className="text-slate-600 text-sm leading-relaxed mb-6 line-clamp-3">
-                      {story.description}
-                    </p>
-                    <button
-                      onClick={() => navigate(`/story/${story.id}`)}
-                      className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition shadow-lg shadow-slate-200"
-                    >
-                      Read Full Story
-                    </button>
-                  </div>
-                </motion.div>
-              ))
-            )}
+            <PostSkeleton />
+            <PostSkeleton />
+            <PostSkeleton />
           </div>
-        ) : activeTab === "All Posts" ? (
-          <div className="grid grid-cols-1 gap-6">
-            {posts.length === 0 ? (
+        ) : activeTab === "All Posts" || activeTab === "Stories" ? (
+          <div className="h-[calc(100vh-200px)]">
+            {allPosts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-4 text-3xl">🌿</div>
                 <p className="text-xl font-bold text-slate-700 mb-2">No posts yet</p>
                 <p className="text-slate-500 text-sm max-w-xs mx-auto">Be the first to share your mindful journey!</p>
               </div>
             ) : (
-              posts.map((item: any, index) => {
-                const isVideoItem = !!item.video_url;
-
-                if (isVideoItem) {
-                  return (
-                    <motion.div
-                      key={item.id}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: index * 0.1 }}
-                      className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 group"
-                    >
-                      <div className="p-4 flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-bold text-xs uppercase">
-                          {item.author_name?.[0] || "U"}
-                        </div>
-                        <div>
-                          <p className="font-bold text-slate-800 text-sm">{item.author_name}</p>
-                          <p className="text-[10px] text-slate-400 font-medium">
-                            {new Date(item.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
+              <Virtuoso
+                useWindowScroll
+                data={allPosts}
+                increaseViewportBy={300}
+                endReached={() => {
+                  if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+                }}
+                components={{
+                  Footer: () => (
+                    <div className="flex justify-center pb-8 pt-4">
+                      {isFetchingNextPage ? (
+                        <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+                      ) : hasNextPage ? (
                         <button
-                          onClick={() => handleReportVideo(item.id)}
-                          className="ml-auto p-2 text-slate-300 hover:text-rose-500 transition-colors"
-                          title="Report Post"
+                          onClick={() => fetchNextPage()}
+                          className="px-8 py-3 bg-white border-2 border-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-50 transition shadow-sm"
                         >
-                          <AlertCircle className="w-5 h-5" />
+                          Load More Reflections
                         </button>
-                      </div>
-
-                      <div
-                        className="aspect-[9/16] max-h-[600px] w-full bg-black shadow-inner"
-                        data-video-id={item.id}
-                      >
-                        <VideoPlayer
-                          src={item.video_url?.startsWith("/static") ? `${BASE_URL}${item.video_url}` : (item.video_url || "")}
-                          className="h-full"
-                          shouldPlay={item.id === activeVideoId}
-                        />
-                      </div>
-
-                      {item.content && (
-                        <div className="p-4 pt-3">
-                          <p className="text-slate-700 text-sm leading-relaxed">
-                            <span className="font-bold mr-2 text-slate-900">{item.author_name}</span>
-                            {item.content}
-                          </p>
-                        </div>
+                      ) : (
+                        <p className="text-slate-400 text-sm italic">You've reached the end of the journey ✨</p>
                       )}
-                    </motion.div>
+                    </div>
+                  )
+                }}
+                itemContent={(_index, item) => {
+                  const isVideoItem = !!item.video_url;
+
+                  if (isVideoItem) {
+                    return (
+                      <div className="mb-6">
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          whileInView={{ opacity: 1, scale: 1 }}
+                          viewport={{ once: true }}
+                          className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 group"
+                        >
+                          <div className="p-4 flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-bold text-xs uppercase">
+                              {item.author_name?.[0] || "U"}
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-800 text-sm">{item.author_name}</p>
+                              <p className="text-[10px] text-slate-400 font-medium">
+                                {new Date(item.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => handleReportVideo(item.id)}
+                              className="ml-auto p-2 text-slate-300 hover:text-rose-500 transition-colors"
+                              title="Report Post"
+                            >
+                              <AlertCircle className="w-5 h-5" />
+                            </button>
+                          </div>
+
+                          <div
+                            className="aspect-[9/16] max-h-[600px] w-full bg-black shadow-inner"
+                            data-video-id={item.id}
+                          >
+                            <VideoPlayer
+                              src={item.video_url?.startsWith("/static") ? `${BASE_URL}${item.video_url}` : (item.video_url || "")}
+                              className="h-full"
+                              shouldPlay={item.id === activeVideoId}
+                            />
+                          </div>
+
+                          {item.content && (
+                            <div className="p-4 pt-3">
+                              <p className="text-slate-700 text-sm leading-relaxed">
+                                <span className="font-bold mr-2 text-slate-900">{item.author_name}</span>
+                                {item.content}
+                              </p>
+                            </div>
+                          )}
+                        </motion.div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="mb-6">
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                      >
+                        <PostCard
+                          post={item}
+                          currentUserId={user?.id || ""}
+                          onLikeToggle={handleLikeToggle}
+                          onCommentSubmit={handleCommentSubmit}
+                          onReport={handleReportPost}
+                        />
+                      </motion.div>
+                    </div>
                   );
-                }
-
-                return (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <PostCard
-                      post={item}
-                      currentUserId={user?.id || ""}
-                      onLikeToggle={handleLikeToggle}
-                      onCommentSubmit={handleCommentSubmit}
-                      onReport={handleReportPost}
-                    />
-                  </motion.div>
-                );
-
-              })
-            )}
-
-            {hasMore && posts.length > 0 && activeTab === "All Posts" && (
-              <div className="flex justify-center pb-8 pt-4">
-                <button
-                  onClick={() => fetchData()}
-                  disabled={loading}
-                  className="px-8 py-3 bg-white border-2 border-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-50 transition shadow-sm disabled:opacity-50"
-                >
-                  {loading ? "Loading..." : "Load More Reflections"}
-                </button>
-              </div>
+                }}
+              />
             )}
           </div>
         ) : (
@@ -1188,7 +1099,7 @@ export default function HomeFeedScreen() {
                           const res = await fetch(`${API_BASE}/friends/accept?request_id=${req.request_id}`, { method: "POST" });
                           if (res.ok) {
                             alert("Friend request accepted!");
-                            fetchFriendRequests();
+                            refetchFriendRequests();
                           }
                         }}
                         className="p-2 bg-emerald-600 text-white rounded-lg"
@@ -1199,7 +1110,7 @@ export default function HomeFeedScreen() {
                         onClick={async () => {
                           const res = await fetch(`${API_BASE}/friends/reject?request_id=${req.request_id}`, { method: "POST" });
                           if (res.ok) {
-                            fetchFriendRequests();
+                            refetchFriendRequests();
                           }
                         }}
                         className="p-2 bg-slate-200 text-slate-600 rounded-lg"
