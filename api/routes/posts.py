@@ -191,15 +191,37 @@ def get_my_posts(user_id: str):
     # Sort by newest first
     combined_posts.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     
+    post_ids = [str(p["_id"]) for p in combined_posts]
+    
+    # BULK FETCH Social Stats
+    likes_counts = {}
+    comments_counts = {}
+    my_likes = set()
+
+    if post_ids:
+        likes_pipeline = [
+            {"$match": {"post_id": {"$in": post_ids}}},
+            {"$group": {"_id": "$post_id", "count": {"$sum": 1}}}
+        ]
+        likes_counts = {item["_id"]: item["count"] for item in db.likes.aggregate(likes_pipeline)}
+
+        comments_pipeline = [
+            {"$match": {"post_id": {"$in": post_ids}}},
+            {"$group": {"_id": "$post_id", "count": {"$sum": 1}}}
+        ]
+        comments_counts = {item["_id"]: item["count"] for item in db.comments.aggregate(comments_pipeline)}
+
+        liked_by_me = db.likes.find({"post_id": {"$in": post_ids}, "user_id": user_id}, {"post_id": 1})
+        my_likes = set(item["post_id"] for item in liked_by_me)
+
     results = []
     for doc in combined_posts:
-        doc["id"] = str(doc["_id"])
+        pid = str(doc["_id"])
+        doc["id"] = pid
         doc["author_profile_pic"] = profile_pic
-
-        # Social Stats
-        doc["likes_count"] = db.likes.count_documents({"post_id": doc["id"]})
-        doc["comments_count"] = db.comments.count_documents({"post_id": doc["id"]})
-        doc["is_liked_by_me"] = bool(db.likes.find_one({"post_id": doc["id"], "user_id": user_id}))
+        doc["likes_count"] = likes_counts.get(pid, 0)
+        doc["comments_count"] = comments_counts.get(pid, 0)
+        doc["is_liked_by_me"] = pid in my_likes
 
         results.append(doc)
     return results

@@ -91,25 +91,24 @@ def get_my_videos(user_id: str):
     db_videos = client[DB_NAME]
     
     # Return all videos for the user from the single collection
-    videos_cursor = db_videos.user_videos.find({"user_id": user_id}).sort("created_at", -1)
+    videos_list = list(db_videos.user_videos.find({"user_id": user_id}).sort("created_at", -1))
     
-    results = []
-    for doc in videos_cursor:
-        doc["id"] = str(doc["_id"])
-        
-        # Populate author
-        user_doc = db_mindrise.users.find_one({"_id": ObjectId(doc["user_id"])})
-        if user_doc:
-            doc["author_name"] = user_doc.get("full_name") or user_doc.get("email") or "MindRise User"
-            doc["author_email"] = user_doc.get("email")
-        elif "author_name" not in doc:
-            doc["author_name"] = "MindRise User"
+    # Fetch author once
+    user_doc = db_mindrise.users.find_one({"_id": ObjectId(user_id)})
+    author_name = "Bodham User"
+    author_email = None
+    if user_doc:
+        author_name = user_doc.get("full_name") or user_doc.get("email") or "Bodham User"
+        author_email = user_doc.get("email")
 
-        # Ensure status is lowercase for frontend compatibility if stored capitalized
-        if "status" in doc:
-            doc["status"] = doc["status"].lower()
-        else:
-            doc["status"] = "pending"
+    results = []
+    for doc in videos_list:
+        doc["id"] = str(doc["_id"])
+        doc["author_name"] = author_name
+        doc["author_email"] = author_email
+
+        # Ensure status is lowercase for frontend compatibility
+        doc["status"] = doc.get("status", "pending").lower()
             
         if isinstance(doc.get("created_at"), datetime):
             doc["created_at"] = doc["created_at"].isoformat()
@@ -127,23 +126,24 @@ def get_user_videos(user_id: str):
     db_videos = client[DB_NAME]
     
     # Return only approved videos for the profile view
-    videos_cursor = db_videos.user_videos.find({
+    videos_list = list(db_videos.user_videos.find({
         "user_id": user_id, 
         "status": "approved"
-    }).sort("created_at", -1)
+    }).sort("created_at", -1))
     
+    # Fetch author once
+    user_doc = db_mindrise.users.find_one({"_id": ObjectId(user_id)})
+    author_name = "Bodham User"
+    author_email = None
+    if user_doc:
+        author_name = user_doc.get("full_name") or user_doc.get("email") or "Bodham User"
+        author_email = user_doc.get("email")
+
     results = []
-    for doc in videos_cursor:
+    for doc in videos_list:
         doc["id"] = str(doc["_id"])
-        
-        # Populate author
-        user_doc = db_mindrise.users.find_one({"_id": ObjectId(doc["user_id"])})
-        if user_doc:
-            doc["author_name"] = user_doc.get("full_name") or user_doc.get("email") or "MindRise User"
-            doc["author_email"] = user_doc.get("email")
-        elif "author_name" not in doc:
-            doc["author_name"] = "MindRise User"
-            
+        doc["author_name"] = author_name
+        doc["author_email"] = author_email
         doc["status"] = "approved"
         
         if isinstance(doc.get("created_at"), datetime):

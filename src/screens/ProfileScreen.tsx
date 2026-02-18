@@ -13,16 +13,17 @@ import {
   CheckCircle2,
   Clock,
   LogOut,
-  Image as ImageIcon,
   Heart,
   MessageCircle,
   X,
   Play
 } from "lucide-react";
-import { User, Post, AppFriend } from "../types";
+import { Post, AppFriend } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import GrowthTree from "../components/GrowthTree";
 import PostCard from "../components/PostCard";
+import ProfileSkeleton from "../components/ProfileSkeleton";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000/api" : "/api")).startsWith("http")
   ? (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000/api" : "/api"))
@@ -32,58 +33,187 @@ export default function ProfileScreen() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userId } = useParams();
-  const { user: currentUser, logout, setUser: setCurrentUser, refreshUser } = useAuth();
+  const { user: currentUser, logout, setUser: setCurrentUser } = useAuth();
 
   const isOwnProfile = !userId || userId === currentUser?.id;
   const targetUserId = userId || currentUser?.id;
 
-  const [targetUser, setTargetUser] = useState<User | null>(null);
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"posts" | "saved" | "friends">("posts");
   const [showSettings, setShowSettings] = useState(false);
-  const [myPosts, setMyPosts] = useState<Post[]>([]);
-  const [friendsList, setFriendsList] = useState<AppFriend[]>([]);
-  const [friendshipStatus, setFriendshipStatus] = useState<"none" | "pending" | "received" | "accepted">("none");
-  const [followersCount, setFollowersCount] = useState(0);
-  const [followingCount, setFollowingCount] = useState(0);
-  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-
-  const [loadingPosts, setLoadingPosts] = useState(false);
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [bioDraft, setBioDraft] = useState("");
-  const [isSavingBio, setIsSavingBio] = useState(false);
   const [isEditingDetails, setIsEditingDetails] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
-  const [isSavingDetails, setIsSavingDetails] = useState(false);
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+
+  // Profile Query
+  const { data: profileData, isLoading: isProfileLoading } = useQuery({
+    queryKey: ["profile", targetUserId],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/users/${targetUserId}?current_user_id=${currentUser?.id || ""}`);
+      if (!res.ok) throw new Error("Failed to fetch profile");
+      return res.json();
+    },
+    enabled: !!targetUserId
+  });
+
+  const targetUser = profileData?.userData;
+  const myPostsFromProfile = profileData?.posts || [];
+  const followersCount = profileData?.followersCount || 0;
+  const followingCount = profileData?.followingCount || 0;
+
+  // Friends Query
+  const { data: friendsList = [] } = useQuery({
+    queryKey: ["friends", targetUserId],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/friends/list?user_id=${targetUserId}`);
+      if (!res.ok) throw new Error("Failed to fetch friends");
+      return res.json() as Promise<AppFriend[]>;
+    },
+    enabled: !!targetUserId && activeTab === "friends"
+  });
+
+  // Friendship Status Query
+  const { data: friendshipStatus = "none" } = useQuery({
+    queryKey: ["friendshipStatus", currentUser?.id, targetUserId],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/friends/status?user1_id=${currentUser?.id}&user2_id=${targetUserId}`);
+      if (!res.ok) return "none";
+      const data = await res.json();
+      return data.status;
+    },
+    enabled: !!currentUser && !!targetUserId && !isOwnProfile
+  });
+
+  // Posts Selection Logic
+  const myPosts = myPostsFromProfile;
+
+  // Mutations
+  const updateBioMutation = useMutation({
+    mutationFn: async (bio: string) => {
+      const res = await fetch(`${API_BASE}/auth/user/${currentUser?.id}/bio`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bio }),
+      });
+      if (!res.ok) throw new Error("Bio update failed");
+      return res.json();
+    },
+    onSuccess: (updatedUser) => {
+      setCurrentUser(updatedUser);
+      setIsEditingBio(false);
+      queryClient.invalidateQueries({ queryKey: ["profile", currentUser?.id] });
+    }
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: { email: string, full_name: string }) => {
+      const res = await fetch(`${API_BASE}/auth/user/${currentUser?.id}/profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Profile update failed");
+      }
+      return res.json();
+    },
+    onSuccess: (updatedUser) => {
+      setCurrentUser(updatedUser);
+      setIsEditingDetails(false);
+      queryClient.invalidateQueries({ queryKey: ["profile", currentUser?.id] });
+      alert("Profile updated successfully!");
+    },
+    onError: (err: Error) => alert(err.message)
+  });
+
+  const likeMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      await fetch(`${API_BASE}/posts/${postId}/like`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: currentUser?.id })
+      });
+    },
+    onMutate: async (postId) => {
+      await queryClient.cancelQueries({ queryKey: ["profile", targetUserId] });
+      const previousProfile = queryClient.getQueryData(["profile", targetUserId]);
+
+      queryClient.setQueryData(["profile", targetUserId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          posts: old.posts.map((p: any) => {
+            if (p.id === postId) {
+              const isLiked = !!p.is_liked_by_me;
+              return {
+                ...p,
+                likes_count: isLiked ? Math.max(0, p.likes_count - 1) : p.likes_count + 1,
+                is_liked_by_me: !isLiked
+              };
+            }
+            return p;
+          })
+        };
+      });
+
+      return { previousProfile };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousProfile) {
+        queryClient.setQueryData(["profile", targetUserId], context.previousProfile);
+      }
+    }
+  });
+
+  const deletePostMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const res = await fetch(`${API_BASE}/posts/${postId}?user_id=${currentUser?.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Delete failed");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile", targetUserId] });
+    }
+  });
+
+  const friendActionMutation = useMutation({
+    mutationFn: async () => {
+      if (friendshipStatus === "none") {
+        const res = await fetch(`${API_BASE}/friends/request?from_user_id=${currentUser?.id}&to_user_id=${targetUserId}`, {
+          method: "POST"
+        });
+        if (!res.ok) throw new Error("Request failed");
+        return "pending";
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["friendshipStatus", currentUser?.id, targetUserId] });
+      alert("Friend request sent!");
+    }
+  });
 
   useEffect(() => {
-    if (targetUserId) {
-      fetchTargetUser(targetUserId);
-      if (isOwnProfile && currentUser) {
-        setNewName(currentUser.full_name || "");
-        setNewEmail(currentUser.email || "");
-        setBioDraft(currentUser.bio || "");
-      }
+    if (isOwnProfile && currentUser) {
+      setNewName(currentUser.full_name || "");
+      setNewEmail(currentUser.email || "");
+      setBioDraft(currentUser.bio || "");
     }
-  }, [targetUserId, currentUser, isOwnProfile]);
+  }, [currentUser, isOwnProfile]);
 
-  const fetchTargetUser = async (id: string) => {
-    try {
-      const res = await fetch(`${API_BASE}/users/${id}?current_user_id=${currentUser?.id || ""}`);
-      if (res.ok) {
-        const data = await res.json();
-        setTargetUser(data.userData);
-        setMyPosts(data.posts);
-        setFollowersCount(data.followersCount || 0);
-        setFollowingCount(data.followingCount || 0);
-      }
-    } catch (e) {
-      console.error("Failed to fetch target user", e);
+  useEffect(() => {
+    if ((location.state as any)?.openEdit && isOwnProfile) {
+      setIsEditingDetails(true);
+      navigate(".", { replace: true, state: {} });
     }
-  };
+  }, [location, navigate, isOwnProfile]);
 
-  // Centralized Video Intersection Observer
+  // Video Intersection Observer
   useEffect(() => {
     const options = {
       root: null,
@@ -102,9 +232,7 @@ export default function ProfileScreen() {
       });
       if (mostVisibleEntry) {
         const id = (mostVisibleEntry as any).target.getAttribute('data-video-id');
-        if (id) {
-          setActiveVideoId(id);
-        }
+        if (id) setActiveVideoId(id);
       } else {
         setActiveVideoId(null);
       }
@@ -117,187 +245,41 @@ export default function ProfileScreen() {
     return () => observer.disconnect();
   }, [myPosts, activeTab]);
 
-  useEffect(() => {
-    if ((location.state as any)?.openEdit && isOwnProfile) {
-      setIsEditingDetails(true);
-      navigate(".", { replace: true, state: {} });
-    }
-  }, [location, navigate, isOwnProfile]);
-
-  useEffect(() => {
-    if (targetUserId) {
-      if (isOwnProfile) {
-        refreshUser();
-        fetchMyPosts(); // Still need to fetch posts if it's own profile and we want the non-aggregated way for now or just unify it
-      } else {
-        fetchTargetUser(targetUserId);
-      }
-      fetchFriends();
-      if (!isOwnProfile) checkFriendship();
-    }
-  }, [targetUserId, isOwnProfile]);
-
-
-  const checkFriendship = async () => {
-    if (!currentUser || !userId) return;
-    try {
-      const res = await fetch(`${API_BASE}/friends/status?user1_id=${currentUser.id}&user2_id=${userId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setFriendshipStatus(data.status);
-      }
-    } catch (err) {
-      console.error("Error checking friendship status", err);
-    }
-  };
-
-  const handleReportPost = async (postId: string) => {
-    if (!currentUser) return;
-    if (!window.confirm("Are you sure you want to report this post for violating guidelines? This will automatically remove it from the community for review.")) return;
-
-    try {
-      const res = await fetch(`${API_BASE}/posts/${postId}/report`, {
+  const reportMutation = useMutation({
+    mutationFn: async ({ type, id }: { type: "post" | "video", id: string }) => {
+      const endpoint = type === "post" ? `/posts/${id}/report` : `/videos/${id}/report`;
+      const res = await fetch(`${API_BASE}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: currentUser.id }),
+        body: JSON.stringify({ user_id: currentUser?.id }),
       });
-
-      if (res.ok) {
-        setMyPosts(prev => prev.filter(p => (p as any).id !== postId));
-        setSelectedPost(null);
-        alert("Post reported and removed. Thank you for keeping Bodham safe!");
-      }
-    } catch (err) {
-      console.error("Failed to report post", err);
+      if (!res.ok) throw new Error(`Failed to report ${type}`);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["profile", targetUserId] });
+      setSelectedPost(null);
+      alert(`${variables.type === "post" ? "Post" : "Video"} reported and removed. Thank you!`);
     }
+  });
+
+  const handleReportPost = (postId: string) => {
+    if (!window.confirm("Report this post?")) return;
+    reportMutation.mutate({ type: "post", id: postId });
   };
 
-  const handleReportVideo = async (videoId: string) => {
-    if (!currentUser) return;
-    if (!window.confirm("Are you sure you want to report this video for violating guidelines? This will automatically remove it from the community for review.")) return;
-
-    try {
-      const res = await fetch(`${API_BASE}/videos/${videoId}/report`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: currentUser.id }),
-      });
-
-      if (res.ok) {
-        setMyPosts(prev => prev.filter(p => (p as any).id !== videoId));
-        setSelectedPost(null);
-        alert("Video reported and removed. Thank you for keeping Bodham safe!");
-      }
-    } catch (err) {
-      console.error("Failed to report video", err);
-    }
-  };
-
-  const fetchFriends = async () => {
-    if (!targetUserId) return;
-    try {
-      const res = await fetch(`${API_BASE}/friends/list?user_id=${targetUserId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setFriendsList(data);
-      }
-    } catch (err) {
-      console.error("Error fetching friends", err);
-    }
-  };
-
-
-  const fetchMyPosts = async () => {
-    if (!targetUserId) return;
-    setLoadingPosts(true);
-    try {
-      const [postsRes, videosRes] = await Promise.all([
-        fetch(`${API_BASE}/posts/my?user_id=${targetUserId}`),
-        fetch(`${API_BASE}/videos/user/${targetUserId}`)
-      ]);
-
-      let allContent: any[] = [];
-
-      if (postsRes.ok) {
-        const postsData = await postsRes.json();
-        if (Array.isArray(postsData)) {
-          allContent = [...allContent, ...postsData.filter((p: any) => p.status !== 'rejected')];
-        }
-      }
-
-      if (videosRes.ok) {
-        const videosData = await videosRes.json();
-        if (Array.isArray(videosData)) {
-          const normalizedVideos = videosData
-            .filter((v: any) => v.status !== 'rejected')
-            .map((v: any) => ({
-              ...v,
-              content: v.caption || v.content || "",
-            }));
-          allContent = [...allContent, ...normalizedVideos];
-        }
-      }
-
-      // Sort combined by created_at newest first
-      allContent.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setMyPosts(allContent);
-    } catch (error) {
-      console.error("Failed to fetch profile content", error);
-    } finally {
-      setLoadingPosts(false);
-    }
-  };
-
-  const handleFriendAction = async () => {
-    if (!currentUser || !userId) return;
-    try {
-      if (friendshipStatus === "none") {
-        const res = await fetch(`${API_BASE}/friends/request?from_user_id=${currentUser.id}&to_user_id=${userId}`, {
-          method: "POST"
-        });
-        if (res.ok) {
-          setFriendshipStatus("pending");
-          alert("Friend request sent!");
-        }
-      } else if (friendshipStatus === "received") {
-        // Find the request ID from notifications or requests list (simplified for now: we need an endpoint to get request id by users)
-        // Or refactor respond to take from/to users.
-        // For now, let's just assume we need to respond.
-        // Actually, backend respond takes request_id.
-        // Let's add an endpoint or search for it.
-        alert("Please respond to the friend request in your notifications 🔔");
-      }
-    } catch (err) {
-      console.error("Friend action failed", err);
-    }
-  };
-
-  const handleDeletePost = async (postId: string) => {
-    if (!confirm("Are you sure you want to delete this post?")) return;
-    try {
-      const res = await fetch(`${API_BASE}/posts/${postId}?user_id=${currentUser?.id}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        setMyPosts(prev => prev.filter(p => p.id !== postId));
-      } else {
-        alert("Failed to delete post");
-      }
-    } catch (error) {
-      console.error("Error deleting post", error);
-    }
+  const handleReportVideo = (videoId: string) => {
+    if (!window.confirm("Report this video?")) return;
+    reportMutation.mutate({ type: "video", id: videoId });
   };
 
   const handleProfilePicUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0] && currentUser) {
       const file = e.target.files[0];
       try {
-        // 1. Get Signature from Backend for ProfilePics
         const sigRes = await fetch(`${API_BASE}/upload/signature?folder=MindRise_ProfilePics`);
         if (!sigRes.ok) throw new Error("Could not get upload signature");
         const { signature, timestamp, api_key, cloud_name, folder } = await sigRes.json();
 
-        // 2. Upload directly to Cloudinary
         const cloudFormData = new FormData();
         cloudFormData.append("file", file);
         cloudFormData.append("api_key", api_key);
@@ -306,20 +288,12 @@ export default function ProfileScreen() {
         cloudFormData.append("folder", folder);
 
         const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${cloud_name}/image/upload`;
-        const cloudRes = await fetch(cloudinaryUrl, {
-          method: "POST",
-          body: cloudFormData,
-        });
-
-        if (!cloudRes.ok) {
-          const cloudErr = await cloudRes.json();
-          throw new Error(cloudErr.error?.message || "Cloudinary upload failed");
-        }
+        const cloudRes = await fetch(cloudinaryUrl, { method: "POST", body: cloudFormData });
+        if (!cloudRes.ok) throw new Error("Cloudinary upload failed");
 
         const cloudData = await cloudRes.json();
         const profilePicUrl = cloudData.secure_url;
 
-        // 3. Save the URL to our backend
         const res = await fetch(`${API_BASE}/auth/user/${currentUser.id}/profile-pic`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -329,70 +303,27 @@ export default function ProfileScreen() {
         if (res.ok) {
           const updatedUser = await res.json();
           setCurrentUser(updatedUser);
+          queryClient.invalidateQueries({ queryKey: ["profile", currentUser.id] });
           alert("Profile picture updated! ✅");
-        } else {
-          alert("Failed to save profile picture URL to backend");
         }
       } catch (error: any) {
-        console.error("Profile pic upload error", error);
-        alert(`Error uploading profile picture: ${error.message}`);
+        alert(`Upload error: ${error.message}`);
       }
     }
   };
 
-  const handleBioSave = async () => {
-    if (!currentUser) return;
-    setIsSavingBio(true);
-    try {
-      const res = await fetch(`${API_BASE}/auth/user/${currentUser.id}/bio`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bio: bioDraft }),
-      });
-      if (res.ok) {
-        const updatedUser = await res.json();
-        setCurrentUser(updatedUser);
-        setIsEditingBio(false);
-      } else {
-        alert("Failed to update bio");
-      }
-    } catch (error) {
-      console.error("Bio update error", error);
-      alert("Error updating bio");
-    } finally {
-      setIsSavingBio(false);
+  const handleFriendAction = () => {
+    if (!currentUser || !targetUserId) return;
+    if (friendshipStatus === "received") {
+      alert("Please respond to the friend request in your notifications 🔔");
+      return;
     }
+    friendActionMutation.mutate();
   };
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentUser) return;
-    setIsSavingDetails(true);
-    try {
-      const res = await fetch(`${API_BASE}/auth/user/${currentUser.id}/profile`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: newEmail,
-          full_name: newName
-        }),
-      });
-
-      if (res.ok) {
-        const updatedUser = await res.json();
-        setCurrentUser(updatedUser);
-        setIsEditingDetails(false);
-        alert("Profile updated successfully!");
-      } else {
-        const data = await res.json();
-        alert(data.detail || "Failed to update profile");
-      }
-    } catch (error) {
-      console.error("Profile update error", error);
-      alert("Error updating profile");
-    } finally {
-      setIsSavingDetails(false);
-    }
+  const handleDeletePost = (postId: string) => {
+    if (!confirm("Delete this post?")) return;
+    deletePostMutation.mutate(postId);
   };
 
   const handleDeleteProfilePic = async () => {
@@ -415,29 +346,17 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleLikeToggle = async (postId: string) => {
-    if (!currentUser) return;
-    try {
-      setMyPosts(prev => prev.map(p => {
-        if (p.id === postId) {
-          const currentLikes = p.likes_count || 0;
-          const isLiked = !!p.is_liked_by_me;
-          return {
-            ...p,
-            likes_count: isLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1,
-            is_liked_by_me: !isLiked
-          };
-        }
-        return p;
-      }));
-      await fetch(`${API_BASE}/posts/${postId}/like`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: currentUser.id })
-      });
-    } catch (error) {
-      console.error("Like toggle failed", error);
-    }
+  const handleLikeToggle = (postId: string) => {
+    likeMutation.mutate(postId);
+  };
+
+  const handleBioSave = () => {
+    updateBioMutation.mutate(bioDraft);
+  };
+
+  const handleUpdateProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateProfileMutation.mutate({ email: newEmail, full_name: newName });
   };
 
   const handleCommentSubmit = async (postId: string, content: string) => {
@@ -449,21 +368,21 @@ export default function ProfileScreen() {
         body: JSON.stringify({ user_id: currentUser.id, content })
       });
       if (res.ok) {
-        setMyPosts(prev => prev.map(p => {
-          if (p.id === postId) {
-            return {
-              ...p,
-              comments_count: (p.comments_count || 0) + 1
-            };
-          }
-          return p;
-        }));
+        queryClient.invalidateQueries({ queryKey: ["profile", targetUserId] });
       }
     } catch (error) {
       console.error("Comment submit failed", error);
     }
   };
 
+
+  if (isProfileLoading) {
+    return (
+      <div className="p-4 pt-8">
+        <ProfileSkeleton />
+      </div>
+    );
+  }
 
   if (!targetUser) return null;
   const isAdmin = currentUser?.role === "admin";
@@ -558,10 +477,10 @@ export default function ProfileScreen() {
                   </button>
                   <button
                     onClick={handleBioSave}
-                    disabled={isSavingBio}
+                    disabled={updateBioMutation.isPending}
                     className="px-4 py-1.5 text-xs font-bold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition disabled:opacity-50"
                   >
-                    {isSavingBio ? "Saving..." : "Save Bio"}
+                    {updateBioMutation.isPending ? "Saving..." : "Save Bio"}
                   </button>
                 </div>
               </motion.div>
@@ -718,11 +637,7 @@ export default function ProfileScreen() {
               exit={{ opacity: 0, x: 20 }}
               className="space-y-4"
             >
-              {loadingPosts ? (
-                <div className="flex justify-center py-12">
-                  <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-500 rounded-full animate-spin"></div>
-                </div>
-              ) : myPosts.length === 0 ? (
+              {myPosts.length === 0 ? (
                 <div className="flex flex-col items-center py-16 text-center">
                   <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center text-3xl mb-4">
                     📝
@@ -733,7 +648,7 @@ export default function ProfileScreen() {
               ) : !isOwnProfile ? (
                 /* Grid Layout for Visitors */
                 <div className="grid grid-cols-3 gap-1">
-                  {myPosts.map((post) => (
+                  {myPosts.map((post: Post) => (
                     <div
                       key={post.id}
                       className="aspect-square relative bg-slate-200 cursor-pointer overflow-hidden group"
@@ -762,7 +677,7 @@ export default function ProfileScreen() {
                 </div>
               ) : (
                 /* Card Layout for Owner (to allow easy management) */
-                myPosts.map((post, index) => (
+                myPosts.map((post: Post, index: number) => (
                   <motion.div
                     key={post.id}
                     initial={{ opacity: 0, y: 20 }}
@@ -970,10 +885,10 @@ export default function ProfileScreen() {
                 </div>
                 <button
                   type="submit"
-                  disabled={isSavingDetails}
+                  disabled={updateProfileMutation.isPending}
                   className="w-full py-3 rounded-xl font-bold text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-50 transition-colors"
                 >
-                  {isSavingDetails ? "Saving..." : "Save Changes"}
+                  {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
                 </button>
               </form>
             </motion.div>
