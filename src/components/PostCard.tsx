@@ -66,7 +66,7 @@ export default function PostCard({ post, currentUserId, activeVideoId, onLikeTog
                             <img src={post.author_profile_pic} alt={post.author_name} className="w-full h-full object-cover" />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-lg">
-                                {post.author_name.charAt(0)}
+                                {post.author_name?.charAt(0) || "B"}
                             </div>
                         )}
                     </div>

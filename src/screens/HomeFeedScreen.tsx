@@ -11,6 +11,7 @@ import VideoPlayer from "../components/VideoPlayer";
 import GrowthTree from "../components/GrowthTree";
 import PostCard from "../components/PostCard";
 import PostSkeleton from "../components/PostSkeleton";
+import StoryCard from "../components/StoryCard";
 
 const TABS = ["All Posts", "Stories", "Daily Quotes", "Gratitude"] as const;
 
@@ -654,7 +655,7 @@ export default function HomeFeedScreen() {
             <PostSkeleton />
             <PostSkeleton />
           </div>
-        ) : activeTab === "All Posts" || activeTab === "Stories" ? (
+        ) : activeTab === "All Posts" ? (
           <div className="h-[calc(100vh-200px)]">
             {allPosts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -762,6 +763,24 @@ export default function HomeFeedScreen() {
                   );
                 }}
               />
+            )}
+          </div>
+        ) : activeTab === "Stories" ? (
+          <div className="space-y-8 pb-20">
+            {allPosts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-3xl border border-dashed border-slate-200">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-2xl">📖</div>
+                <p className="font-bold text-slate-700">No stories yet</p>
+                <p className="text-slate-400 text-sm max-w-[200px] mx-auto">Community stories will appear here soon.</p>
+              </div>
+            ) : (
+              allPosts.map((story: any) => (
+                <StoryCard
+                  key={story.id}
+                  story={story}
+                  onClick={() => {/* Navigate to story detail if we have one */ }}
+                />
+              ))
             )}
           </div>
         ) : (

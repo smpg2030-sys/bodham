@@ -15,6 +15,7 @@ def story_helper(story) -> dict:
         "content": story.get("content"),
         "image_url": story.get("image_url"),
         "author": story.get("author"),
+        "author_name": story.get("author") or "Bodham Community",
         "created_at": story.get("created_at")
     }
 
