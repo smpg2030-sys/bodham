@@ -151,6 +151,48 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleReportPost = async (postId: string) => {
+    if (!currentUser) return;
+    if (!window.confirm("Are you sure you want to report this post for violating guidelines? This will automatically remove it from the community for review.")) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/posts/${postId}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: currentUser.id }),
+      });
+
+      if (res.ok) {
+        setMyPosts(prev => prev.filter(p => (p as any).id !== postId));
+        setSelectedPost(null);
+        alert("Post reported and removed. Thank you for keeping Bodham safe!");
+      }
+    } catch (err) {
+      console.error("Failed to report post", err);
+    }
+  };
+
+  const handleReportVideo = async (videoId: string) => {
+    if (!currentUser) return;
+    if (!window.confirm("Are you sure you want to report this video for violating guidelines? This will automatically remove it from the community for review.")) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/videos/${videoId}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: currentUser.id }),
+      });
+
+      if (res.ok) {
+        setMyPosts(prev => prev.filter(p => (p as any).id !== videoId));
+        setSelectedPost(null);
+        alert("Video reported and removed. Thank you for keeping Bodham safe!");
+      }
+    } catch (err) {
+      console.error("Failed to report video", err);
+    }
+  };
+
   const fetchFriends = async () => {
     if (!targetUserId) return;
     try {
@@ -734,6 +776,7 @@ export default function ProfileScreen() {
                       onLikeToggle={handleLikeToggle}
                       onCommentSubmit={handleCommentSubmit}
                       onDelete={handleDeletePost}
+                      onReport={handleReportPost}
                     />
                     {post.status === "rejected" && post.rejection_reason && (
                       <div className="bg-rose-50 p-3 rounded-xl mt-2 mx-1 border border-rose-100 text-xs text-rose-700">
@@ -1016,7 +1059,17 @@ export default function ProfileScreen() {
                     </div>
                     <span className="text-xs text-slate-400">{new Date(selectedPost.created_at).toLocaleDateString()}</span>
                   </div>
-                  <p className="font-bold text-slate-800 text-sm">{selectedPost.likes_count} likes</p>
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-slate-800 text-sm">{selectedPost.likes_count} likes</p>
+                    {currentUser && targetUserId !== currentUser.id && (
+                      <button
+                        onClick={() => selectedPost.video_url ? handleReportVideo(selectedPost.id) : handleReportPost(selectedPost.id)}
+                        className="text-slate-400 hover:text-rose-500 transition-colors flex items-center gap-1 text-[10px] uppercase font-bold"
+                      >
+                        Report Post
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </motion.div>

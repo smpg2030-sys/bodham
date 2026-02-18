@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Body
 from database import get_db
 from models import VideoCreate, VideoResponse
 from config import DB_NAME
@@ -178,3 +178,45 @@ def get_video_status(video_id: str):
         return {"status": video.get("status", "pending").lower(), "rejection_reason": video.get("rejection_reason")}
     
     raise HTTPException(status_code=404, detail="Video not found")
+@router.post("/{video_id}/report")
+def report_video(video_id: str, user_id: str = Body(..., embed=True)):
+    from database import get_client
+    client = get_client()
+    db_mindrise = get_db()
+    db_videos = client[DB_NAME]
+    
+    try:
+        vid = ObjectId(video_id)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid Video ID")
+
+    # 1. Find the video
+    video = db_videos.user_videos.find_one({"_id": vid})
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+    
+    if video.get("status") == "rejected":
+        return {"message": "Video already reported or removed"}
+
+    # 2. Update status and set rejection reason
+    timestamp = datetime.utcnow().isoformat()
+    db_videos.user_videos.update_one(
+        {"_id": vid},
+        {"$set": {
+            "status": "rejected",
+            "rejection_reason": "The post has been deleted for violating the app's guidelines",
+            "moderated_at": timestamp,
+            "moderation_source": "automatic_report_v2"
+        }}
+    )
+    
+    # 3. Notify owner
+    db_mindrise.notifications.insert_one({
+        "user_id": video["user_id"],
+        "message": "The post has been deleted for violating the app's guidelines",
+        "type": "system_violation",
+        "post_id": video_id,
+        "created_at": datetime.utcnow()
+    })
+    
+    return {"message": "Video reported and removed from public view"}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Heart, MessageCircle, Send, Trash2 } from "lucide-react";
+import { Heart, MessageCircle, Send, Trash2, AlertCircle } from "lucide-react";
 import { Post, Comment } from "../types";
 import VideoPlayer from "./VideoPlayer";
 
@@ -11,9 +11,10 @@ interface PostCardProps {
     onLikeToggle: (postId: string) => void;
     onCommentSubmit: (postId: string, content: string) => void;
     onDelete?: (postId: string) => void;
+    onReport?: (postId: string) => void;
 }
 
-export default function PostCard({ post, currentUserId, activeVideoId, onLikeToggle, onCommentSubmit, onDelete }: PostCardProps) {
+export default function PostCard({ post, currentUserId, activeVideoId, onLikeToggle, onCommentSubmit, onDelete, onReport }: PostCardProps) {
     const navigate = useNavigate();
     const [commentText, setCommentText] = useState("");
     const [showComments, setShowComments] = useState(false);
@@ -89,6 +90,15 @@ export default function PostCard({ post, currentUserId, activeVideoId, onLikeTog
                     {currentUserId === post.user_id && onDelete && (
                         <button onClick={() => onDelete(post.id)} className="text-slate-400 hover:text-red-500">
                             <Trash2 className="w-5 h-5" />
+                        </button>
+                    )}
+                    {currentUserId !== post.user_id && onReport && (
+                        <button
+                            onClick={() => onReport(post.id)}
+                            className="text-slate-300 hover:text-rose-500 transition-colors"
+                            title="Report Post"
+                        >
+                            <AlertCircle className="w-5 h-5" />
                         </button>
                     )}
                 </div>

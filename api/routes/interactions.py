@@ -120,3 +120,41 @@ def add_comment(post_id: str, comment: CommentCreate, user_id: str = Body(..., e
         content=comment.content,
         created_at=doc["created_at"].isoformat()
     )
+@router.post("/{post_id}/report")
+def report_post(post_id: str, user_id: str = Body(..., embed=True)):
+    db = get_db()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database connection not established")
+    
+    # 1. Find the post in approved posts
+    post = db.posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        # Check if already in pending/rejected
+        existing_pending = db.pending_posts.find_one({"_id": ObjectId(post_id)})
+        if existing_pending:
+            return {"message": "Post already reported or under review"}
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    # 2. Update status and move to pending_posts (hide from public)
+    timestamp = datetime.utcnow().isoformat()
+    moderation_updates = {
+        "status": "rejected",
+        "rejection_reason": "The post has been deleted for violating the app's guidelines",
+        "moderated_at": timestamp,
+        "moderation_source": "automatic_report_v2"
+    }
+    
+    post.update(moderation_updates)
+    db.pending_posts.insert_one(post)
+    db.posts.delete_one({"_id": ObjectId(post_id)})
+    
+    # 3. Notify owner
+    db.notifications.insert_one({
+        "user_id": post["user_id"],
+        "message": "The post has been deleted for violating the app's guidelines",
+        "type": "system_violation",
+        "post_id": post_id,
+        "created_at": datetime.utcnow()
+    })
+    
+    return {"message": "Post reported and removed for review"}

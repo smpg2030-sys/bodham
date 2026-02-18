@@ -204,6 +204,48 @@ export default function HomeFeedScreen() {
     }
   };
 
+  const handleReportPost = async (postId: string) => {
+    if (!user) return;
+    if (!window.confirm("Are you sure you want to report this post for violating guidelines? This will automatically remove it from the community for review.")) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/posts/${postId}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id }),
+      });
+
+      if (res.ok) {
+        setPosts(prev => prev.filter(p => (p as any).id !== postId));
+        setSubmissionFeedback({ type: 'success', message: 'Post reported and removed. Thank you for keeping Bodham safe!' });
+        setTimeout(() => setSubmissionFeedback(null), 3000);
+      }
+    } catch (err) {
+      console.error("Failed to report post", err);
+    }
+  };
+
+  const handleReportVideo = async (videoId: string) => {
+    if (!user) return;
+    if (!window.confirm("Are you sure you want to report this video for violating guidelines? This will automatically remove it from the community for review.")) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/videos/${videoId}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id }),
+      });
+
+      if (res.ok) {
+        setPosts(prev => prev.filter(p => (p as any).id !== videoId));
+        setSubmissionFeedback({ type: 'success', message: 'Video reported and removed. Thank you for keeping Bodham safe!' });
+        setTimeout(() => setSubmissionFeedback(null), 3000);
+      }
+    } catch (err) {
+      console.error("Failed to report video", err);
+    }
+  };
+
   const fetchNotifications = async () => {
     if (!user) return;
     try {
@@ -747,6 +789,13 @@ export default function HomeFeedScreen() {
                             {new Date(item.created_at).toLocaleDateString()}
                           </p>
                         </div>
+                        <button
+                          onClick={() => handleReportVideo(item.id)}
+                          className="ml-auto p-2 text-slate-300 hover:text-rose-500 transition-colors"
+                          title="Report Post"
+                        >
+                          <AlertCircle className="w-5 h-5" />
+                        </button>
                       </div>
 
                       <div
@@ -784,6 +833,7 @@ export default function HomeFeedScreen() {
                       currentUserId={user?.id || ""}
                       onLikeToggle={handleLikeToggle}
                       onCommentSubmit={handleCommentSubmit}
+                      onReport={handleReportPost}
                     />
                   </motion.div>
                 );
