@@ -13,7 +13,7 @@ def process_post_moderation(post_id: str):
         db = get_db()
         if db is None: return
 
-        post = db.pending_posts.find_one({"_id": ObjectId(post_id)})
+        post = db.posts.find_one({"_id": ObjectId(post_id)})
         if not post: return
 
         # AI Check
@@ -32,24 +32,14 @@ def process_post_moderation(post_id: str):
             "moderation_status": result["status"],
             "moderation_category": result["category"],
             "moderation_source": "AI",
-            "moderation_logs": post.get("moderation_logs", []) + [log_entry]
+            "moderation_logs": post.get("moderation_logs", []) + [log_entry],
+            "status": result["status"]
         }
 
-        if result["status"] == "approved":
-            # Auto-publish: Move to approved posts
-            post.update(updates)
-            post["status"] = "approved"
-            db.posts.insert_one(post)
-            db.pending_posts.delete_one({"_id": ObjectId(post_id)})
-            
-        elif result["status"] == "flagged":
-            updates["status"] = "flagged"
-            db.pending_posts.update_one({"_id": ObjectId(post_id)}, {"$set": updates})
-            
-        else: # rejected
-            updates["status"] = "rejected"
+        if result["status"] == "rejected":
             updates["rejection_reason"] = f"AI Rejection ({result['category']}): {', '.join(result['details'])}"
-            db.pending_posts.update_one({"_id": ObjectId(post_id)}, {"$set": updates})
+        
+        db.posts.update_one({"_id": ObjectId(post_id)}, {"$set": updates})
             
     except Exception as e:
         print(f"Moderation error for post {post_id}: {e}")
@@ -84,19 +74,14 @@ def create_post(post: PostCreate, user_id: str, author_name: str, background_tas
         "rejection_reason": mod_result["details"][0] if mod_result["status"] == "rejected" else None
     }
 
-    if mod_result["status"] == "approved":
-        # Instant Approval
-        doc["status"] = "approved"
-        result = db.posts.insert_one(doc)
-    else:
-        # Instant/Pending Rejection or Flagged
-        doc["status"] = mod_result["status"]
-        result = db.pending_posts.insert_one(doc)
-        
-        # If it was returned as 'pending' or 'flagged' (meaning a real API call or rate limit happened),
-        # or if we want to ensure any 'flagged' status gets an AI re-pass in background:
-        if mod_result["status"] in ["flagged", "pending"] and mod_result["category"] != "safe":
-             background_tasks.add_task(process_post_moderation, str(result.inserted_id))
+    # Always insert into posts collection
+    doc["status"] = mod_result["status"]
+    result = db.posts.insert_one(doc)
+    
+    # If it was returned as 'pending' or 'flagged' (meaning a real API call or rate limit happened),
+    # or if we want to ensure any 'flagged' status gets an AI re-pass in background:
+    if mod_result["status"] in ["flagged", "pending"] and mod_result["category"] != "safe":
+         background_tasks.add_task(process_post_moderation, str(result.inserted_id))
     
     doc["id"] = str(result.inserted_id)
 
@@ -196,15 +181,13 @@ def get_my_posts(user_id: str):
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established")
     
-    # Return all posts for the user from both collections
-    approved_posts = list(db.posts.find({"user_id": user_id}))
-    pending_posts = list(db.pending_posts.find({"user_id": user_id, "status": {"$ne": "rejected"}}))
+    # Return all posts for the user from single collection
+    combined_posts = list(db.posts.find({"user_id": user_id, "status": {"$ne": "rejected"}}))
     
     # Fetch user for profile pic
     user = db.users.find_one({"_id": ObjectId(user_id)})
     profile_pic = user.get("profile_pic") if user else None
 
-    combined_posts = approved_posts + pending_posts
     # Sort by newest first
     combined_posts.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     
@@ -227,11 +210,10 @@ def delete_post(post_id: str, user_id: str):
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established")
     
-    # Attempt deletion in both collections
-    result_approved = db.posts.delete_one({"_id": ObjectId(post_id), "user_id": user_id})
-    result_pending = db.pending_posts.delete_one({"_id": ObjectId(post_id), "user_id": user_id})
+    # Attempt deletion in single collection
+    result = db.posts.delete_one({"_id": ObjectId(post_id), "user_id": user_id})
     
-    if result_approved.deleted_count == 0 and result_pending.deleted_count == 0:
+    if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Post not found or unauthorized")
     
     return {"message": "Post deleted"}
@@ -242,14 +224,9 @@ def get_post_status(post_id: str):
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established")
     
-    # Check approved collection first
+    # Check posts collection
     post = db.posts.find_one({"_id": ObjectId(post_id)})
     if post:
-        return {"status": "approved"}
-    
-    # Check pending collection
-    pending_post = db.pending_posts.find_one({"_id": ObjectId(post_id)})
-    if (pending_post):
-        return {"status": pending_post.get("status", "pending").lower(), "rejection_reason": pending_post.get("rejection_reason")}
+        return {"status": post.get("status", "pending").lower(), "rejection_reason": post.get("rejection_reason")}
     
     raise HTTPException(status_code=404, detail="Post not found")

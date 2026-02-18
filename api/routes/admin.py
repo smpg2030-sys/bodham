@@ -148,10 +148,8 @@ def admin_delete_post(post_id: str, role: str):
     if role != "admin":
         raise HTTPException(status_code=403, detail="Forbidden: Admin access required")
     
-    db = get_db()
-    # Try delete from both
+    # Attempt delete from single posts collection
     db.posts.delete_one({"_id": ObjectId(post_id)})
-    db.pending_posts.delete_one({"_id": ObjectId(post_id)})
     
     return {"message": "Post deleted by admin"}
 
@@ -167,8 +165,8 @@ def get_stats(role: str):
     email_users = db.users.count_documents({"email": {"$ne": None}})
     mobile_users = db.users.count_documents({"mobile": {"$ne": None}})
     
-    pending_posts = db.pending_posts.count_documents({"status": "pending"})
-    flagged_posts = db.pending_posts.count_documents({"status": "flagged"}) 
+    pending_posts = db.posts.count_documents({"status": "pending"})
+    flagged_posts = db.posts.count_documents({"status": "flagged"}) 
     
     # Count pending videos from MindRiseDB
     client = get_client()
@@ -211,10 +209,8 @@ def get_posts(role: str, status: str = "all", search_user: str | None = None):
         user_ids = [str(u["_id"]) for u in users]
         query["user_id"] = {"$in": user_ids} if user_ids else "NONE"
 
-    # Fetch from both collections
-    approved = list(db.posts.find(query))
-    pending_rejected = list(db.pending_posts.find(query))
-    combined = approved + pending_rejected
+    # Fetch from single collection
+    combined = list(db.posts.find(query))
     
     # Sort and return
     combined.sort(key=lambda x: x.get("created_at", ""), reverse=True)
@@ -235,13 +231,8 @@ def update_post_status(post_id: str, update: PostStatusUpdate, role: str):
         raise HTTPException(status_code=403, detail="Admin access required")
     db = get_db()
     
-    # Find post in pending first, then approved
-    post = db.pending_posts.find_one({"_id": ObjectId(post_id)})
-    collection_from = "pending_posts"
-    if not post:
-        post = db.posts.find_one({"_id": ObjectId(post_id)})
-        collection_from = "posts"
-        
+    # Find post to get existing logs
+    post = db.posts.find_one({"_id": ObjectId(post_id)})
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
@@ -257,23 +248,12 @@ def update_post_status(post_id: str, update: PostStatusUpdate, role: str):
         "moderation_status": update.status,
         "moderation_source": "admin_override",
         "moderation_logs": post.get("moderation_logs", []) + [log_entry],
-        "status": update.status,
+        "status": update.status.lower(),
         "rejection_reason": update.rejection_reason if update.status == "rejected" else None
     }
 
-    if update.status == "approved" and collection_from == "pending_posts":
-        # Move to approved
-        post.update(moderation_updates)
-        db.posts.insert_one(post)
-        db.pending_posts.delete_one({"_id": ObjectId(post_id)})
-    elif update.status == "rejected" and collection_from == "posts":
-        # Move to pending/rejected
-        post.update(moderation_updates)
-        db.pending_posts.insert_one(post)
-        db.posts.delete_one({"_id": ObjectId(post_id)})
-    else:
-        # Just update in current collection
-        db[collection_from].update_one({"_id": ObjectId(post_id)}, {"$set": moderation_updates})
+    # Update in posts collection
+    db.posts.update_one({"_id": ObjectId(post_id)}, {"$set": moderation_updates})
 
     return {"message": f"Post status updated to {update.status} with override log."}
 
@@ -369,8 +349,6 @@ def optimize_db(role: str):
     db.users.create_index([("mobile", 1)])
     db.posts.create_index([("user_id", 1)])
     db.posts.create_index([("status", 1)])
-    db.pending_posts.create_index([("user_id", 1)])
-    db.pending_posts.create_index([("status", 1)])
     
     client = get_client()
     db_v = client[DB_NAME]

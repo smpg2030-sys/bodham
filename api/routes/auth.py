@@ -69,7 +69,14 @@ async def register(data: UserRegister, background_tasks: BackgroundTasks):
             # Resend OTP logic could go here
             pass
 
+    # Rate Limit Check
+    if existing_user:
+        last_sent = existing_user.get("otp_sent_at")
+        if last_sent and (datetime.utcnow() - last_sent).total_seconds() < 60:
+             raise HTTPException(status_code=429, detail="Please wait 60 seconds before requesting another OTP")
+
     otp = generate_otp()
+    timestamp = datetime.utcnow()
     
     doc = {
         "email": data.email,
@@ -80,7 +87,8 @@ async def register(data: UserRegister, background_tasks: BackgroundTasks):
         "role": "user",
         "is_verified": False,
         "is_phone_verified": getattr(data, "is_phone_verified", False),
-        "otp": otp
+        "otp": otp,
+        "otp_sent_at": timestamp
     }
     
     # Update if exists (unverified), else insert
@@ -96,7 +104,7 @@ async def register(data: UserRegister, background_tasks: BackgroundTasks):
     # Send OTP
     if data.email:
         message = MessageSchema(
-            subject="MindRise Verification OTP",
+            subject="Bodham Verification OTP",
             recipients=[data.email],
             body=f"Your verification code is: {otp}",
             subtype=MessageType.html
@@ -115,15 +123,24 @@ async def send_otp(data: OTPRequest):
     if db is None:
         raise HTTPException(status_code=503, detail="Database not available")
     
+    # Rate Limit Check
+    existing_otp = db.otp_codes.find_one({"phone_number": data.phone_number})
+    if existing_otp:
+        last_sent = existing_otp.get("last_sent_at")
+        if last_sent and (datetime.utcnow() - last_sent).total_seconds() < 60:
+             raise HTTPException(status_code=429, detail="Please wait 60 seconds before requesting another OTP")
+
     otp = generate_otp()
-    expires_at = datetime.utcnow() + timedelta(minutes=5)
+    now = datetime.utcnow()
+    expires_at = now + timedelta(minutes=5)
     
-    # Store OTP with attempt counter and expiry
+    # Store OTP with attempt counter, expiry, and sent timestamp
     db.otp_codes.update_one(
         {"phone_number": data.phone_number},
         {"$set": {
             "otp": otp,
             "expires_at": expires_at,
+            "last_sent_at": now,
             "attempts": 0
         }},
         upsert=True

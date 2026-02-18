@@ -16,10 +16,7 @@ def toggle_like(post_id: str, user_id: str = Body(..., embed=True)):
     # Check if post exists
     post = db.posts.find_one({"_id": ObjectId(post_id)})
     if not post:
-        # Check pending posts too just in case, though usually we like approved posts
-        post = db.pending_posts.find_one({"_id": ObjectId(post_id)})
-        if not post:
-            raise HTTPException(status_code=404, detail="Post not found")
+        raise HTTPException(status_code=404, detail="Post not found")
 
     # Check if already liked
     existing_like = db.likes.find_one({"post_id": post_id, "user_id": user_id})
@@ -82,9 +79,7 @@ def add_comment(post_id: str, comment: CommentCreate, user_id: str = Body(..., e
     # Check if post exists
     post = db.posts.find_one({"_id": ObjectId(post_id)})
     if not post:
-        post = db.pending_posts.find_one({"_id": ObjectId(post_id)})
-        if not post:
-            raise HTTPException(status_code=404, detail="Post not found")
+        raise HTTPException(status_code=404, detail="Post not found")
 
     doc = {
         "post_id": post_id,
@@ -126,27 +121,25 @@ def report_post(post_id: str, user_id: str = Body(..., embed=True)):
     if db is None:
         raise HTTPException(status_code=503, detail="Database connection not established")
     
-    # 1. Find the post in approved posts
+    # 1. Find the post in posts collection
     post = db.posts.find_one({"_id": ObjectId(post_id)})
     if not post:
-        # Check if already in pending/rejected
-        existing_pending = db.pending_posts.find_one({"_id": ObjectId(post_id)})
-        if existing_pending:
-            return {"message": "Post already reported or under review"}
         raise HTTPException(status_code=404, detail="Post not found")
 
-    # 2. Update status and move to pending_posts (hide from public)
+    if post.get("status") == "rejected":
+        return {"message": "Post already reported or removed"}
+
+    # 2. Update status in-place (hide from public feed via status filter)
     timestamp = datetime.utcnow().isoformat()
-    moderation_updates = {
-        "status": "rejected",
-        "rejection_reason": "The post has been deleted for violating the app's guidelines",
-        "moderated_at": timestamp,
-        "moderation_source": "automatic_report_v2"
-    }
-    
-    post.update(moderation_updates)
-    db.pending_posts.insert_one(post)
-    db.posts.delete_one({"_id": ObjectId(post_id)})
+    db.posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$set": {
+            "status": "rejected",
+            "rejection_reason": "The post has been deleted for violating the app's guidelines",
+            "moderated_at": timestamp,
+            "moderation_source": "automatic_report_v2"
+        }}
+    )
     
     # 3. Notify owner
     db.notifications.insert_one({
