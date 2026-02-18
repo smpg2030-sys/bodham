@@ -103,7 +103,7 @@ export default function LoginScreen() {
           seller_status: data.seller_status || "none",
           business_name: data.business_name
         });
-        navigate("/", { replace: true });
+        navigate("/goals", { replace: true });
         return;
       }
 

@@ -43,7 +43,7 @@ export default function VerifyOTPScreen() {
             setUser(data);
 
             setMessage({ type: "success", text: "Verified! Redirecting..." });
-            setTimeout(() => navigate("/", { replace: true }), 1500);
+            setTimeout(() => navigate("/goals", { replace: true }), 1500);
 
         } catch (err: any) {
             setMessage({ type: "error", text: err.message });

@@ -27,7 +27,7 @@ export default function GoalsScreen() {
     try {
       localStorage.setItem("bodham_goals", JSON.stringify(selectedGoals));
     } catch { }
-    navigate("/login");
+    navigate("/");
   };
 
   return (

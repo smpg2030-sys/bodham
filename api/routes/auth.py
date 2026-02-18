@@ -9,7 +9,8 @@ from database import get_db
 from models import UserRegister, UserLogin, UserResponse, PasswordResetRequest, PasswordResetConfirm, OTPRequest, OTPVerifyRequest
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 from pydantic import BaseModel, EmailStr
-from services.sms import SMSService
+from dotenv import load_dotenv
+load_dotenv(override=True)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
