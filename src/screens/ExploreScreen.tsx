@@ -5,12 +5,12 @@ import { useAuth } from "../context/AuthContext";
 
 // Category icons and labels
 const CATEGORIES = [
-  { icon: "☀️", title: "Meditation", subtitle: "120+ Sessions", bg: "bg-emerald-100" },
-  { icon: "🖼️", title: "Journaling", subtitle: "Daily Prompts", bg: "bg-sky-100" },
-  { icon: "🛒", title: "Marketplace", subtitle: "Mindful Shop", bg: "bg-indigo-100" },
-  { icon: "🏪", title: "Seller Hub", subtitle: "Manage Store", bg: "bg-violet-100" },
-  { icon: "📖", title: "E-Books", subtitle: "Wellness Library", bg: "bg-amber-100" },
-  { icon: "👥", title: "Community", subtitle: "Stories & Support", bg: "bg-rose-100" },
+  { icon: "☀️", title: "Meditation", bg: "bg-emerald-100" },
+  { icon: "🖼️", title: "Journaling", bg: "bg-sky-100" },
+  { icon: "🛒", title: "Marketplace", bg: "bg-indigo-100" },
+  { icon: "🏪", title: "Seller Hub", bg: "bg-violet-100" },
+  { icon: "📖", title: "E-Books", bg: "bg-amber-100" },
+  { icon: "👥", title: "Community", subtitle: "Stories", bg: "bg-rose-100" },
 ];
 
 const EBOOKS = [
