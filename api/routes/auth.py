@@ -16,11 +16,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 from datetime import datetime, timedelta
 
-# Email Configuration
+# Email Configuration (Optimized for Deliverability)
 conf = ConnectionConfig(
-    MAIL_USERNAME=os.getenv("EMAIL_USERNAME", ""),
-    MAIL_PASSWORD=os.getenv("EMAIL_PASSWORD", ""),
-    MAIL_FROM=os.getenv("EMAIL_FROM", "noreply@mindrise.com"),
+    MAIL_USERNAME=os.getenv("EMAIL_USERNAME", "bodham.app@gmail.com"),
+    MAIL_PASSWORD=os.getenv("EMAIL_PASSWORD", "nyzq jsgl mpec xbap"),
+    MAIL_FROM=os.getenv("EMAIL_FROM", "bodham.app@gmail.com"),
     MAIL_PORT=int(os.getenv("EMAIL_PORT", 587)),
     MAIL_SERVER=os.getenv("EMAIL_HOST", "smtp.gmail.com"),
     MAIL_STARTTLS=True,
