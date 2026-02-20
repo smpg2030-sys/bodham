@@ -54,7 +54,7 @@ export default function WelcomeScreen() {
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         type="button"
-        onClick={() => navigate("/goals")}
+        onClick={() => navigate("/login")}
         className="w-full max-w-xs py-4 rounded-2xl font-bold text-white bg-slate-900 shadow-xl shadow-slate-200 hover:shadow-2xl transition-all z-10 flex items-center justify-center gap-2 group"
       >
         <span>Get Started</span>
