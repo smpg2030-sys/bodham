@@ -49,41 +49,49 @@ export default function ExploreScreen() {
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#f8fafc]">
-      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 py-4 flex items-center justify-between shadow-sm">
-        <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Explore</h1>
-        <button type="button" className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors" aria-label="Notifications">
+    <div className="w-full min-h-screen bg-[#fdfdfd]">
+      <header className="sticky top-0 z-10 glass-premium border-b border-white/20 px-6 py-6 flex items-center justify-between">
+        <h1 className="font-premium text-3xl text-slate-900 tracking-tight">Explore</h1>
+        <button type="button" className="p-3 text-slate-600 hover:bg-emerald-50 hover:text-emerald-900 rounded-full transition-all" aria-label="Notifications">
           <Bell className="w-5 h-5" />
         </button>
       </header>
 
       <div className="p-4">
-        <div className="mb-6">
-          <input
-            type="text"
-            className="w-full p-3 bg-slate-100 rounded-xl border-0"
-            placeholder="Search meditations, journals..."
-          />
+        <div className="mb-8">
+          <div className="relative group">
+            <input
+              type="text"
+              className="input-field pl-12"
+              placeholder="Search meditations, journals..."
+            />
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-800 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
         </div>
 
         <button
           type="button"
           onClick={() => navigate("/support")}
-          className="w-full mb-6 p-4 rounded-xl bg-green-100 flex items-center justify-between hover:bg-green-200 transition"
+          className="w-full mb-10 p-5 rounded-3xl bg-slate-900 text-white flex items-center justify-between hover:bg-emerald-950 transition-all shadow-xl shadow-emerald-900/10 group overflow-hidden relative"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-pink-400 rounded-full flex items-center justify-center text-2xl">
-              💗
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent pointer-events-none" />
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">
+              🤍
             </div>
             <div className="text-left">
-              <div className="font-semibold text-slate-800">Need immediate support?</div>
-              <div className="text-sm text-slate-600">We're here for you 24/7</div>
+              <div className="font-premium text-lg">Sanctuary Support</div>
+              <div className="text-xs text-emerald-100 opacity-60 font-medium uppercase tracking-widest">Available 24/7 for you</div>
             </div>
           </div>
-          <span className="text-slate-500">→</span>
+          <span className="text-emerald-400 font-bold group-hover:translate-x-2 transition-transform">→</span>
         </button>
 
-        <h2 className="text-xl font-bold text-slate-800 mb-4">Categories</h2>
+        <h2 className="font-premium text-2xl text-slate-900 mb-6 px-1">Discover Categories</h2>
         <div className="grid grid-cols-2 gap-4">
           {visibleCategories.map((cat) => (
             <button
@@ -96,11 +104,12 @@ export default function ExploreScreen() {
                 if (cat.title === "Marketplace") navigate("/marketplace");
                 if (cat.title === "Seller Hub") navigate("/seller/dashboard");
               }}
-              className={`${cat.bg} rounded-xl p-6 text-left transition hover:opacity-90`}
+              className={`${cat.bg} rounded-3xl p-8 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-lg shadow-sm group border border-white/50 relative overflow-hidden`}
             >
-              <span className="text-3xl block mb-2">{cat.icon}</span>
-              <div className="font-bold text-slate-800">{cat.title}</div>
-              <div className="text-sm text-slate-600">{cat.subtitle}</div>
+              <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:bg-white/20 transition-colors" />
+              <span className="text-4xl block mb-4 filter drop-shadow-sm group-hover:scale-110 transition-transform origin-left">{cat.icon}</span>
+              <div className="font-premium text-2xl text-slate-900 mb-1">{cat.title}</div>
+              <div className="text-xs text-slate-500 font-bold uppercase tracking-wider opacity-60">{cat.subtitle || "Access Room"}</div>
             </button>
           ))}
         </div>

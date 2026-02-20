@@ -65,14 +65,15 @@ export default function HomeFeedScreen() {
     queryKey: ["feed", activeTab],
     queryFn: async ({ pageParam = 0 }) => {
       const pParam = pageParam as number;
-      if (activeTab !== "All Posts") {
+      if (activeTab === "Stories" || activeTab === "Daily Quotes" || activeTab === "Gratitude") {
         const res = await fetch(`${API_BASE}/community-stories/`);
         if (!res.ok) throw new Error("Failed to fetch stories");
         return { items: await res.json(), nextCursor: null };
       }
 
       const skip = pParam * 15;
-      const postsUrl = activeTab === "Discover"
+      const isDiscover = activeTab === "Discover";
+      const postsUrl = isDiscover
         ? `${API_BASE}/posts/?limit=15&skip=${skip}`
         : `${API_BASE}/posts/?user_id=${user?.id || ""}&limit=15&skip=${skip}`;
 
@@ -467,728 +468,739 @@ export default function HomeFeedScreen() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="w-full"
+      className="w-full bg-[#fdfdfd] min-h-screen"
     >
-      {/* Status Feedback Popup - Root level for maximum visibility */}
-      <AnimatePresence>
-        {submissionFeedback && (
-          <motion.div
-            key="submission-feedback-popup"
-            initial={{ y: -100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -100, opacity: 0 }}
-            className="fixed inset-x-0 top-0 z-[99999] p-4 flex justify-center pointer-events-none"
-          >
-            <div className={`w-full max-w-md p-5 rounded-2xl shadow-2xl border-2 flex items-center gap-4 backdrop-blur-2xl pointer-events-auto ${submissionFeedback.type === 'success'
-              ? 'bg-emerald-600/95 border-emerald-400 text-white'
-              : 'bg-rose-600/95 border-rose-400 text-white'
-              }`}>
-              {submissionFeedback.type === 'success' ? (
-                <CheckCircle2 className="w-6 h-6 flex-shrink-0" />
-              ) : (
-                <AlertCircle className="w-6 h-6 flex-shrink-0" />
-              )}
-              <p className="text-sm font-bold leading-tight">
-                {submissionFeedback.message}
-              </p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl px-4 py-4 flex items-center justify-between border-b border-slate-100/50 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="relative group">
-            <div
-              className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold bg-gradient-to-br from-emerald-400 to-emerald-600 overflow-hidden shadow-md border-2 border-white group-hover:scale-105 transition-transform duration-300 cursor-pointer select-none active:scale-95 touch-none"
-              onPointerDown={() => {
-                pressStartTime.current = Date.now();
-                longPressTimer.current = setTimeout(() => {
-                  if (user?.profile_pic) {
-                    setShowFullProfilePic(true);
-                  }
-                }, 1000);
-              }}
-              onPointerUp={() => {
-                const pressDuration = Date.now() - pressStartTime.current;
-                if (longPressTimer.current) {
-                  clearTimeout(longPressTimer.current);
-                  longPressTimer.current = null;
-                }
-
-                // If held for less than 1 second, it's a normal tap
-                if (pressDuration < 1000 && !showFullProfilePic) {
-                  navigate("/profile");
-                }
-              }}
-              onPointerLeave={() => {
-                if (longPressTimer.current) {
-                  clearTimeout(longPressTimer.current);
-                  longPressTimer.current = null;
-                }
-              }}
-            >
-              {user?.profile_pic ? (
-                <img src={user.profile_pic} alt="" className="w-full h-full object-cover pointer-events-none" />
-              ) : (
-                user?.full_name?.[0] || user?.email?.[0]?.toUpperCase() || "M"
-              )}
-            </div>
-          </div>
-          <h1 className="text-lg font-bold text-slate-800 tracking-tight truncate max-w-[200px]">
-            {`Welcome, ${user?.full_name || user?.email?.split("@")[0] || "Friend"}`}
-          </h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <GrowthTree
-            variant="mini"
-            createdAt={user?.created_at}
-            manualStreak={user?.streak_count || 1}
-            onClick={() => navigate("/profile")}
-          />
-          <button
-            type="button"
-            onClick={() => setShowSearch(true)}
-            className="p-2.5 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
-            aria-label="Search"
-          >
-            <Search className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowNewPost(true)}
-            className="p-2.5 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
-            aria-label="Create Post"
-          >
-            <Plus className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowNotifications(true)}
-            className="p-2.5 text-slate-600 relative hover:bg-slate-100 rounded-full transition-colors"
-            aria-label="Notifications"
-          >
-            <Bell className="w-5 h-5" />
-            {(friendRequests.length > 0 || notifications.length > 0) && (
-              <span className="absolute top-2 right-2.5 w-2 h-2 bg-rose-500 rounded-full border border-white"></span>
-            )}
-          </button>
-        </div>
-      </header>
-
-      <div className="sticky top-[73px] z-10 bg-white/90 backdrop-blur-sm px-4 py-3 border-b border-slate-100/50 overflow-x-auto no-scrollbar">
-        <div className="flex gap-2">
-          {TABS.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`px-5 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-300 shadow-sm ${activeTab === tab
-                ? "bg-slate-800 text-white shadow-slate-200 scale-105"
-                : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300"
-                }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+      {/* Premium Background Accents */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-emerald-50 rounded-full blur-[120px] opacity-60" />
+        <div className="absolute top-[20%] -right-[5%] w-[30%] h-[30%] bg-amber-50 rounded-full blur-[100px] opacity-40" />
       </div>
 
-      <div className="px-4 pt-4 pb-20 space-y-6">
+      <div className="relative z-10">
+        {/* Status Feedback Popup - Root level for maximum visibility */}
         <AnimatePresence>
-          {showProfileBanner && (
+          {submissionFeedback && (
             <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-xl p-4 flex items-center justify-between"
+              key="submission-feedback-popup"
+              initial={{ y: -100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -100, opacity: 0 }}
+              className="fixed inset-x-0 top-0 z-[99999] p-4 flex justify-center pointer-events-none"
             >
-              <div>
-                <p className="font-bold text-amber-800 text-sm">Complete your profile</p>
-                <p className="text-xs text-amber-600">Add your email and name to recover your account easily.</p>
+              <div className={`w-full max-w-md p-5 rounded-2xl shadow-2xl border-2 flex items-center gap-4 backdrop-blur-2xl pointer-events-auto ${submissionFeedback.type === 'success'
+                ? 'bg-emerald-600/95 border-emerald-400 text-white'
+                : 'bg-rose-600/95 border-rose-400 text-white'
+                }`}>
+                {submissionFeedback.type === 'success' ? (
+                  <CheckCircle2 className="w-6 h-6 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="w-6 h-6 flex-shrink-0" />
+                )}
+                <p className="text-sm font-bold leading-tight">
+                  {submissionFeedback.message}
+                </p>
               </div>
-              <button
-                onClick={() => navigate("/profile", { state: { openEdit: true } })}
-                className="px-4 py-2 bg-amber-500 text-white text-xs font-bold rounded-lg shadow-sm hover:bg-amber-600 transition"
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <header className="sticky top-0 z-20 glass-premium px-6 py-6 flex items-center justify-between border-b border-white/20">
+          <div className="flex items-center gap-4">
+            <div className="relative group">
+              <div
+                className="w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center text-white font-premium bg-gradient-to-br from-emerald-800 to-emerald-950 overflow-hidden shadow-xl ring-4 ring-white transition-all transform group-hover:scale-110 cursor-pointer select-none active:scale-95 touch-none"
+                onPointerDown={() => {
+                  pressStartTime.current = Date.now();
+                  longPressTimer.current = setTimeout(() => {
+                    if (user?.profile_pic) {
+                      setShowFullProfilePic(true);
+                    }
+                  }, 1000);
+                }}
+                onPointerUp={() => {
+                  const pressDuration = Date.now() - pressStartTime.current;
+                  if (longPressTimer.current) {
+                    clearTimeout(longPressTimer.current);
+                    longPressTimer.current = null;
+                  }
+
+                  // If held for less than 1 second, it's a normal tap
+                  if (pressDuration < 1000 && !showFullProfilePic) {
+                    navigate("/profile");
+                  }
+                }}
+                onPointerLeave={() => {
+                  if (longPressTimer.current) {
+                    clearTimeout(longPressTimer.current);
+                    longPressTimer.current = null;
+                  }
+                }}
               >
-                Complete
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Pending Status Bar - Only show when pending */}
-        <AnimatePresence mode="wait">
-          {pendingItem && pendingItem.status === 'pending' && (
-            <motion.div
-              key="pending-status"
-              initial={{ height: 0, opacity: 0, scale: 0.95 }}
-              animate={{ height: 'auto', opacity: 1, scale: 1 }}
-              exit={{ height: 0, opacity: 0, scale: 0.95 }}
-              className="overflow-hidden"
-            >
-              <div className="p-4 rounded-3xl border-2 shadow-sm flex flex-col gap-3 bg-white border-slate-100">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
-                    <span className="font-bold text-sm text-slate-700">
-                      Reviewing your reflection...
-                    </span>
-                  </div>
-                  {pendingItem.type === 'video' && (
-                    <div className="w-12 h-12 rounded-lg bg-slate-900 flex items-center justify-center text-white">
-                      <VideoIcon className="w-5 h-5 animate-pulse" />
-                    </div>
-                  )}
-                </div>
-
-                <div className="relative h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${pendingItem.progress}%` }}
-                    className="absolute top-0 left-0 h-full rounded-full transition-all duration-500 shadow-sm bg-slate-900"
-                  />
-                </div>
+                {user?.profile_pic ? (
+                  <img src={user.profile_pic} alt="" className="w-full h-full object-cover pointer-events-none" />
+                ) : (
+                  user?.full_name?.[0] || user?.email?.[0]?.toUpperCase() || "M"
+                )}
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        {isFeedLoading && allPosts.length === 0 ? (
-          <div className="grid grid-cols-1 gap-6">
-            <PostSkeleton />
-            <PostSkeleton />
-            <PostSkeleton />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-emerald-900 uppercase tracking-[0.2em] mb-0.5 opacity-60">Your Practice</p>
+              <h1 className="font-premium text-2xl text-slate-900 tracking-tight truncate max-w-[200px]">
+                {user?.full_name || user?.email?.split("@")[0] || "Friend"}
+              </h1>
+            </div>
+            <GrowthTree
+              variant="mini"
+              createdAt={user?.created_at}
+              manualStreak={user?.streak_count || 1}
+              onClick={() => navigate("/profile")}
+            />
           </div>
-        ) : activeTab === "All Posts" || activeTab === "Discover" ? (
-          <div className="h-[calc(100vh-200px)]">
-            {allPosts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-4 text-3xl">🌿</div>
-                <p className="text-xl font-bold text-slate-700 mb-2">No posts yet</p>
-                <p className="text-slate-500 text-sm max-w-xs mx-auto">Be the first to share your mindful journey!</p>
-              </div>
-            ) : (
-              <Virtuoso
-                useWindowScroll
-                data={allPosts}
-                increaseViewportBy={300}
-                endReached={() => {
-                  if (hasNextPage && !isFetchingNextPage) fetchNextPage();
-                }}
-                components={{
-                  Footer: () => (
-                    <div className="flex justify-center pb-8 pt-4">
-                      {isFetchingNextPage ? (
-                        <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
-                      ) : hasNextPage ? (
-                        <button
-                          onClick={() => fetchNextPage()}
-                          className="px-8 py-3 bg-white border-2 border-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-50 transition shadow-sm"
-                        >
-                          Load More Reflections
-                        </button>
-                      ) : (
-                        <p className="text-slate-400 text-sm italic">You've reached the end of the journey ✨</p>
-                      )}
-                    </div>
-                  )
-                }}
-                itemContent={(_index, item) => {
-                  const isVideoItem = !!item.video_url;
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowSearch(true)}
+              className="p-3 text-slate-600 hover:bg-emerald-50 hover:text-emerald-900 rounded-full transition-all"
+              aria-label="Search"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowNewPost(true)}
+              className="p-3 text-white bg-emerald-900 rounded-full transition-all shadow-lg shadow-emerald-900/20 hover:scale-110 active:scale-95"
+              aria-label="Create Post"
+            >
+              <Plus className="w-6 h-6" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowNotifications(true)}
+              className="p-3 text-slate-600 relative hover:bg-emerald-50 hover:text-emerald-900 rounded-full transition-all"
+              aria-label="Notifications"
+            >
+              <Bell className="w-5 h-5" />
+              {(friendRequests.length > 0 || notifications.length > 0) && (
+                <span className="absolute top-3 right-3 w-2 h-2 bg-rose-500 rounded-full border-2 border-white animate-pulse"></span>
+              )}
+            </button>
+          </div>
+        </header>
 
-                  if (isVideoItem) {
+        <div className="sticky top-[89px] z-10 glass-premium px-4 py-4 border-b border-white/20 overflow-x-auto no-scrollbar">
+          <div className="flex gap-4">
+            {TABS.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest whitespace-nowrap transition-all duration-500 ${activeTab === tab
+                  ? "bg-emerald-950 text-white shadow-xl shadow-emerald-900/20 scale-105"
+                  : "bg-white/50 text-slate-500 border border-slate-100 hover:bg-white hover:text-emerald-900"
+                  }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="px-4 pt-4 pb-20 space-y-6">
+          <AnimatePresence>
+            {showProfileBanner && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-xl p-4 flex items-center justify-between"
+              >
+                <div>
+                  <p className="font-bold text-amber-800 text-sm">Complete your profile</p>
+                  <p className="text-xs text-amber-600">Add your email and name to recover your account easily.</p>
+                </div>
+                <button
+                  onClick={() => navigate("/profile", { state: { openEdit: true } })}
+                  className="px-4 py-2 bg-amber-500 text-white text-xs font-bold rounded-lg shadow-sm hover:bg-amber-600 transition"
+                >
+                  Complete
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Pending Status Bar - Only show when pending */}
+          <AnimatePresence mode="wait">
+            {pendingItem && pendingItem.status === 'pending' && (
+              <motion.div
+                key="pending-status"
+                initial={{ height: 0, opacity: 0, scale: 0.95 }}
+                animate={{ height: 'auto', opacity: 1, scale: 1 }}
+                exit={{ height: 0, opacity: 0, scale: 0.95 }}
+                className="overflow-hidden"
+              >
+                <div className="p-4 rounded-3xl border-2 shadow-sm flex flex-col gap-3 bg-white border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
+                      <span className="font-bold text-sm text-slate-700">
+                        Reviewing your reflection...
+                      </span>
+                    </div>
+                    {pendingItem.type === 'video' && (
+                      <div className="w-12 h-12 rounded-lg bg-slate-900 flex items-center justify-center text-white">
+                        <VideoIcon className="w-5 h-5 animate-pulse" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="relative h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pendingItem.progress}%` }}
+                      className="absolute top-0 left-0 h-full rounded-full transition-all duration-500 shadow-sm bg-slate-900"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {isFeedLoading && allPosts.length === 0 ? (
+            <div className="grid grid-cols-1 gap-6">
+              <PostSkeleton />
+              <PostSkeleton />
+              <PostSkeleton />
+            </div>
+          ) : activeTab === "All Posts" || activeTab === "Discover" ? (
+            <div className="h-[calc(100vh-200px)]">
+              {allPosts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-4 text-3xl">🌿</div>
+                  <p className="text-xl font-bold text-slate-700 mb-2">No posts yet</p>
+                  <p className="text-slate-500 text-sm max-w-xs mx-auto">Be the first to share your mindful journey!</p>
+                </div>
+              ) : (
+                <Virtuoso
+                  useWindowScroll
+                  data={allPosts}
+                  increaseViewportBy={300}
+                  endReached={() => {
+                    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+                  }}
+                  components={{
+                    Footer: () => (
+                      <div className="flex justify-center pb-8 pt-4">
+                        {isFetchingNextPage ? (
+                          <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+                        ) : hasNextPage ? (
+                          <button
+                            onClick={() => fetchNextPage()}
+                            className="px-8 py-3 bg-white border-2 border-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-50 transition shadow-sm"
+                          >
+                            Load More Reflections
+                          </button>
+                        ) : (
+                          <p className="text-slate-400 text-sm italic">You've reached the end of the journey ✨</p>
+                        )}
+                      </div>
+                    )
+                  }}
+                  itemContent={(_index, item) => {
+                    const isVideoItem = !!item.video_url;
+
+                    if (isVideoItem) {
+                      return (
+                        <div className="mb-6">
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            whileInView={{ opacity: 1, scale: 1 }}
+                            viewport={{ once: true }}
+                            className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 group"
+                          >
+                            <div className="p-4 flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-bold text-xs uppercase">
+                                {item.author_name?.[0] || "U"}
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-800 text-sm">{item.author_name}</p>
+                                <p className="text-[10px] text-slate-400 font-medium">
+                                  {new Date(item.created_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => handleReportVideo(item.id)}
+                                className="ml-auto p-2 text-slate-300 hover:text-rose-500 transition-colors"
+                                title="Report Post"
+                              >
+                                <AlertCircle className="w-5 h-5" />
+                              </button>
+                            </div>
+
+                            <div
+                              className="aspect-[9/16] max-h-[600px] w-full bg-black shadow-inner"
+                              data-video-id={item.id}
+                            >
+                              <VideoPlayer
+                                src={item.video_url?.startsWith("/static") ? `${BASE_URL}${item.video_url}` : (item.video_url || "")}
+                                className="h-full"
+                                shouldPlay={item.id === activeVideoId}
+                              />
+                            </div>
+
+                            {item.content && (
+                              <div className="p-4 pt-3">
+                                <p className="text-slate-700 text-sm leading-relaxed">
+                                  <span className="font-bold mr-2 text-slate-900">{item.author_name}</span>
+                                  {item.content}
+                                </p>
+                              </div>
+                            )}
+                          </motion.div>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div className="mb-6">
                         <motion.div
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          whileInView={{ opacity: 1, scale: 1 }}
+                          initial={{ opacity: 0, y: 20 }}
+                          whileInView={{ opacity: 1, y: 0 }}
                           viewport={{ once: true }}
-                          className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 group"
                         >
-                          <div className="p-4 flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-600 font-bold text-xs uppercase">
-                              {item.author_name?.[0] || "U"}
-                            </div>
-                            <div>
-                              <p className="font-bold text-slate-800 text-sm">{item.author_name}</p>
-                              <p className="text-[10px] text-slate-400 font-medium">
-                                {new Date(item.created_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => handleReportVideo(item.id)}
-                              className="ml-auto p-2 text-slate-300 hover:text-rose-500 transition-colors"
-                              title="Report Post"
-                            >
-                              <AlertCircle className="w-5 h-5" />
-                            </button>
-                          </div>
-
-                          <div
-                            className="aspect-[9/16] max-h-[600px] w-full bg-black shadow-inner"
-                            data-video-id={item.id}
-                          >
-                            <VideoPlayer
-                              src={item.video_url?.startsWith("/static") ? `${BASE_URL}${item.video_url}` : (item.video_url || "")}
-                              className="h-full"
-                              shouldPlay={item.id === activeVideoId}
-                            />
-                          </div>
-
-                          {item.content && (
-                            <div className="p-4 pt-3">
-                              <p className="text-slate-700 text-sm leading-relaxed">
-                                <span className="font-bold mr-2 text-slate-900">{item.author_name}</span>
-                                {item.content}
-                              </p>
-                            </div>
-                          )}
+                          <PostCard
+                            post={item}
+                            currentUserId={user?.id || ""}
+                            onLikeToggle={handleLikeToggle}
+                            onCommentSubmit={handleCommentSubmit}
+                            onReport={handleReportPost}
+                          />
                         </motion.div>
                       </div>
                     );
-                  }
-
-                  return (
-                    <div className="mb-6">
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                      >
-                        <PostCard
-                          post={item}
-                          currentUserId={user?.id || ""}
-                          onLikeToggle={handleLikeToggle}
-                          onCommentSubmit={handleCommentSubmit}
-                          onReport={handleReportPost}
-                        />
-                      </motion.div>
-                    </div>
-                  );
-                }}
-              />
-            )}
-          </div>
-        ) : activeTab === "Stories" ? (
-          <div className="space-y-8 pb-20">
-            {allPosts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-3xl border border-dashed border-slate-200">
-                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-2xl">📖</div>
-                <p className="font-bold text-slate-700">No stories yet</p>
-                <p className="text-slate-400 text-sm max-w-[200px] mx-auto">Community stories will appear here soon.</p>
-              </div>
-            ) : (
-              allPosts.map((story: any) => (
-                <StoryCard
-                  key={story.id}
-                  story={story}
-                  onClick={() => {/* Navigate to story detail */ }}
+                  }}
                 />
-              ))
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <p className="font-medium italic">Content for this tab coming soon...</p>
-          </div>
-        )}
-      </div>
-
-      <AnimatePresence>
-        {showNewPost && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md p-4 flex items-end sm:items-center justify-center"
-            onClick={() => setShowNewPost(false)}
-          >
-            <motion.div
-              initial={{ y: 100, scale: 0.9 }}
-              animate={{ y: 0, scale: 1 }}
-              exit={{ y: 100, scale: 0.9 }}
-              className="bg-white w-full max-w-lg rounded-t-[32px] sm:rounded-3xl shadow-2xl overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-slate-800">New Reflection</h2>
-                  <button
-                    onClick={() => setShowNewPost(false)}
-                    className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
-                  >
-                    ×
-                  </button>
+              )}
+            </div>
+          ) : activeTab === "Stories" ? (
+            <div className="space-y-8 pb-20">
+              {allPosts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-3xl border border-dashed border-slate-200">
+                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-2xl">📖</div>
+                  <p className="font-bold text-slate-700">No stories yet</p>
+                  <p className="text-slate-400 text-sm max-w-[200px] mx-auto">Community stories will appear here soon.</p>
                 </div>
+              ) : (
+                allPosts.map((story: any) => (
+                  <StoryCard
+                    key={story.id}
+                    story={story}
+                    onClick={() => {/* Navigate to story detail */ }}
+                  />
+                ))
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+              <p className="font-medium italic">Content for this tab coming soon...</p>
+            </div>
+          )}
+        </div>
 
-                <textarea
-                  className="w-full h-40 p-4 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-emerald-500 focus:bg-white transition-all duration-300 resize-none outline-none text-slate-700 font-medium placeholder:text-slate-400"
-                  placeholder="What's on your mind today?"
-                  value={postContent}
-                  onChange={(e) => setPostContent(e.target.value)}
-                />
-
-                <p className="mt-2 text-[10px] text-slate-400 font-medium flex items-center gap-1.5 px-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                  Note: All posts are reviewed by an admin before being published to the community.
-                </p>
-
-                {(imagePreview || (isVideo && selectedFile)) && (
-                  <div className="mt-4 relative group aspect-video rounded-2xl overflow-hidden border border-slate-200 bg-black">
-                    {isVideo ? (
-                      <video
-                        src={imagePreview || undefined}
-                        className="w-full h-full object-contain"
-                        controls
-                        autoPlay
-                        muted
-                        loop
-                      />
-                    ) : (
-                      <img src={imagePreview || ""} alt="Preview" className="w-full h-full object-cover" />
-                    )}
+        <AnimatePresence>
+          {showNewPost && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md p-4 flex items-end sm:items-center justify-center"
+              onClick={() => setShowNewPost(false)}
+            >
+              <motion.div
+                initial={{ y: 100, scale: 0.9 }}
+                animate={{ y: 0, scale: 1 }}
+                exit={{ y: 100, scale: 0.9 }}
+                className="bg-white w-full max-w-lg rounded-t-[32px] sm:rounded-3xl shadow-2xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-bold text-slate-800">New Reflection</h2>
                     <button
-                      onClick={() => {
-                        setImagePreview(null);
-                        setSelectedFile(null);
-                      }}
-                      className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => setShowNewPost(false)}
+                      className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
                     >
                       ×
                     </button>
                   </div>
-                )}
 
-                <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-6">
-                  <div className="flex gap-2">
-                    {/* Camera Options Popover Trigger */}
-                    <div className="relative">
+                  <textarea
+                    className="w-full h-40 p-4 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-emerald-500 focus:bg-white transition-all duration-300 resize-none outline-none text-slate-700 font-medium placeholder:text-slate-400"
+                    placeholder="What's on your mind today?"
+                    value={postContent}
+                    onChange={(e) => setPostContent(e.target.value)}
+                  />
+
+                  <p className="mt-2 text-[10px] text-slate-400 font-medium flex items-center gap-1.5 px-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    Note: All posts are reviewed by an admin before being published to the community.
+                  </p>
+
+                  {(imagePreview || (isVideo && selectedFile)) && (
+                    <div className="mt-4 relative group aspect-video rounded-2xl overflow-hidden border border-slate-200 bg-black">
+                      {isVideo ? (
+                        <video
+                          src={imagePreview || undefined}
+                          className="w-full h-full object-contain"
+                          controls
+                          autoPlay
+                          muted
+                          loop
+                        />
+                      ) : (
+                        <img src={imagePreview || ""} alt="Preview" className="w-full h-full object-cover" />
+                      )}
                       <button
-                        onClick={() => setShowCameraOptions(!showCameraOptions)}
-                        className="w-12 h-12 flex items-center justify-center rounded-2xl bg-violet-50 text-violet-600 hover:bg-violet-100 transition-all active:scale-95 group"
+                        onClick={() => {
+                          setImagePreview(null);
+                          setSelectedFile(null);
+                        }}
+                        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
                       >
-                        <Camera className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                        ×
                       </button>
-
-                      {/* Camera Options Menu */}
-                      <AnimatePresence>
-                        {showCameraOptions && (
-                          <>
-                            <div
-                              className="fixed inset-0 z-[150]"
-                              onClick={() => setShowCameraOptions(false)}
-                            />
-                            <motion.div
-                              initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                              animate={{ opacity: 1, y: 0, scale: 1 }}
-                              exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                              className="absolute bottom-full left-0 mb-2 bg-white rounded-xl shadow-xl border border-slate-100 p-1 w-36 z-[160] flex flex-col gap-1 overflow-hidden"
-                            >
-                              <button
-                                onClick={() => {
-                                  cameraPhotoInputRef.current?.click();
-                                  setShowCameraOptions(false);
-                                }}
-                                className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-700 font-medium w-full text-left"
-                              >
-                                <Camera className="w-4 h-4 text-violet-500" />
-                                <span>Take Photo</span>
-                              </button>
-                              <button
-                                onClick={() => {
-                                  cameraVideoInputRef.current?.click();
-                                  setShowCameraOptions(false);
-                                }}
-                                className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-700 font-medium w-full text-left"
-                              >
-                                <VideoIcon className="w-4 h-4 text-rose-500" />
-                                <span>Record Video</span>
-                              </button>
-                            </motion.div>
-                          </>
-                        )}
-                      </AnimatePresence>
-
-                      {/* Hidden Strict Inputs */}
-                      <input
-                        ref={cameraPhotoInputRef}
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setSelectedFile(file);
-                            setIsVideo(false);
-                            const reader = new FileReader();
-                            reader.onloadend = () => setImagePreview(reader.result as string);
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                      <input
-                        ref={cameraVideoInputRef}
-                        type="file"
-                        className="hidden"
-                        accept="video/*"
-                        capture="environment"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setSelectedFile(file);
-                            setIsVideo(true);
-                            const previewUrl = URL.createObjectURL(file);
-                            setImagePreview(previewUrl);
-                          }
-                        }}
-                      />
                     </div>
-                    <label className="w-12 h-12 flex items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all active:scale-95 cursor-pointer">
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setSelectedFile(file);
-                            setIsVideo(false);
-                            const reader = new FileReader();
-                            reader.onloadend = () => setImagePreview(reader.result as string);
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                      <ImageIcon className="w-5 h-5" />
-                    </label>
-                    <label className="w-12 h-12 flex items-center justify-center rounded-2xl bg-sky-50 text-sky-600 hover:bg-sky-100 transition-all active:scale-95 cursor-pointer">
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="video/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setSelectedFile(file);
-                            setIsVideo(true);
-                            const previewUrl = URL.createObjectURL(file);
-                            setImagePreview(previewUrl);
-                          }
-                        }}
-                      />
-                      <VideoIcon className="w-5 h-5" />
-                    </label>
-                  </div>
+                  )}
 
-                  <button
-                    onClick={handlePostSubmit}
-                    disabled={isUploading || (!postContent.trim() && !selectedFile)}
-                    className="px-8 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:shadow-none transition-all active:scale-95 flex items-center gap-2"
-                  >
-                    {isUploading ? "Posting..." : "Share Now"}
-                    {!isUploading && "🌿"}
-                  </button>
+                  <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-6">
+                    <div className="flex gap-2">
+                      {/* Camera Options Popover Trigger */}
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowCameraOptions(!showCameraOptions)}
+                          className="w-12 h-12 flex items-center justify-center rounded-2xl bg-violet-50 text-violet-600 hover:bg-violet-100 transition-all active:scale-95 group"
+                        >
+                          <Camera className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                        </button>
+
+                        {/* Camera Options Menu */}
+                        <AnimatePresence>
+                          {showCameraOptions && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-[150]"
+                                onClick={() => setShowCameraOptions(false)}
+                              />
+                              <motion.div
+                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                className="absolute bottom-full left-0 mb-2 bg-white rounded-xl shadow-xl border border-slate-100 p-1 w-36 z-[160] flex flex-col gap-1 overflow-hidden"
+                              >
+                                <button
+                                  onClick={() => {
+                                    cameraPhotoInputRef.current?.click();
+                                    setShowCameraOptions(false);
+                                  }}
+                                  className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-700 font-medium w-full text-left"
+                                >
+                                  <Camera className="w-4 h-4 text-violet-500" />
+                                  <span>Take Photo</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    cameraVideoInputRef.current?.click();
+                                    setShowCameraOptions(false);
+                                  }}
+                                  className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 rounded-lg text-sm text-slate-700 font-medium w-full text-left"
+                                >
+                                  <VideoIcon className="w-4 h-4 text-rose-500" />
+                                  <span>Record Video</span>
+                                </button>
+                              </motion.div>
+                            </>
+                          )}
+                        </AnimatePresence>
+
+                        {/* Hidden Strict Inputs */}
+                        <input
+                          ref={cameraPhotoInputRef}
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setSelectedFile(file);
+                              setIsVideo(false);
+                              const reader = new FileReader();
+                              reader.onloadend = () => setImagePreview(reader.result as string);
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                        <input
+                          ref={cameraVideoInputRef}
+                          type="file"
+                          className="hidden"
+                          accept="video/*"
+                          capture="environment"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setSelectedFile(file);
+                              setIsVideo(true);
+                              const previewUrl = URL.createObjectURL(file);
+                              setImagePreview(previewUrl);
+                            }
+                          }}
+                        />
+                      </div>
+                      <label className="w-12 h-12 flex items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all active:scale-95 cursor-pointer">
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setSelectedFile(file);
+                              setIsVideo(false);
+                              const reader = new FileReader();
+                              reader.onloadend = () => setImagePreview(reader.result as string);
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                        <ImageIcon className="w-5 h-5" />
+                      </label>
+                      <label className="w-12 h-12 flex items-center justify-center rounded-2xl bg-sky-50 text-sky-600 hover:bg-sky-100 transition-all active:scale-95 cursor-pointer">
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="video/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setSelectedFile(file);
+                              setIsVideo(true);
+                              const previewUrl = URL.createObjectURL(file);
+                              setImagePreview(previewUrl);
+                            }
+                          }}
+                        />
+                        <VideoIcon className="w-5 h-5" />
+                      </label>
+                    </div>
+
+                    <button
+                      onClick={handlePostSubmit}
+                      disabled={isUploading || (!postContent.trim() && !selectedFile)}
+                      className="px-8 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:opacity-50 disabled:shadow-none transition-all active:scale-95 flex items-center gap-2"
+                    >
+                      {isUploading ? "Posting..." : "Share Now"}
+                      {!isUploading && "🌿"}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showSearch && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[120] bg-white"
+            >
+              <div className="p-4 flex items-center gap-3 border-b">
+                <button onClick={() => setShowSearch(false)} className="p-2">
+                  <ArrowLeft className="w-6 h-6" />
+                </button>
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    autoFocus
+                    className="w-full py-2.5 pl-10 pr-4 bg-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    placeholder="Find mindful friends..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      if (e.target.value.trim().length > 2) {
+                        setSearchingUsers(true);
+                        fetch(`${API_BASE}/friends/search?query=${e.target.value}&current_user_id=${user?.id || ""}`)
+                          .then(r => r.json())
+                          .then(d => {
+                            setSearchResults(d);
+                            setSearchingUsers(false);
+                          });
+                      } else {
+                        setSearchResults([]);
+                      }
+                    }}
+                  />
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
-      <AnimatePresence>
-        {showSearch && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[120] bg-white"
-          >
-            <div className="p-4 flex items-center gap-3 border-b">
-              <button onClick={() => setShowSearch(false)} className="p-2">
-                <ArrowLeft className="w-6 h-6" />
-              </button>
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  autoFocus
-                  className="w-full py-2.5 pl-10 pr-4 bg-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20"
-                  placeholder="Find mindful friends..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    if (e.target.value.trim().length > 2) {
-                      setSearchingUsers(true);
-                      fetch(`${API_BASE}/friends/search?query=${e.target.value}&current_user_id=${user?.id || ""}`)
-                        .then(r => r.json())
-                        .then(d => {
-                          setSearchResults(d);
-                          setSearchingUsers(false);
-                        });
-                    } else {
-                      setSearchResults([]);
-                    }
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="p-4 space-y-4 overflow-y-auto h-[calc(100vh-80px)]">
-              {searchingUsers ? (
-                <div className="text-center py-10 text-slate-400">Searching...</div>
-              ) : searchResults.length > 0 ? (
-                searchResults.map((u: any) => (
-                  <div key={u.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold overflow-hidden cursor-pointer"
-                        onClick={() => {
-                          setShowSearch(false);
-                          navigate(`/profile/${u.id}`);
-                        }}
-                      >
-                        {u.profile_pic ? <img src={u.profile_pic} alt="" className="w-full h-full object-cover" /> : u.full_name?.[0] || u.email[0].toUpperCase()}
+              <div className="p-4 space-y-4 overflow-y-auto h-[calc(100vh-80px)]">
+                {searchingUsers ? (
+                  <div className="text-center py-10 text-slate-400">Searching...</div>
+                ) : searchResults.length > 0 ? (
+                  searchResults.map((u: any) => (
+                    <div key={u.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold overflow-hidden cursor-pointer"
+                          onClick={() => {
+                            setShowSearch(false);
+                            navigate(`/profile/${u.id}`);
+                          }}
+                        >
+                          {u.profile_pic ? <img src={u.profile_pic} alt="" className="w-full h-full object-cover" /> : u.full_name?.[0] || u.email[0].toUpperCase()}
+                        </div>
+                        <div
+                          className="cursor-pointer"
+                          onClick={() => {
+                            setShowSearch(false);
+                            navigate(`/profile/${u.id}`);
+                          }}
+                        >
+                          <p className="font-bold text-slate-800 hover:text-emerald-600 transition-colors">{u.full_name || u.email.split("@")[0]}</p>
+                          <p className="text-xs text-slate-500">{u.role}</p>
+                        </div>
                       </div>
+                      <button
+                        onClick={async () => {
+                          const res = await fetch(`${API_BASE}/friends/request`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ from_user_id: user?.id, to_user_id: u.id }),
+                          });
+                          if (res.ok) alert("Friend request sent!");
+                          else alert("Already friends or request pending.");
+                        }}
+                        className="px-4 py-2 bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm hover:bg-emerald-600 transition"
+                      >
+                        Connect
+                      </button>
+                    </div>
+                  ))
+                ) : searchQuery && (
+                  <div className="text-center py-10 text-slate-400">No users found.</div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showNotifications && (
+            <motion.div
+              initial={{ opacity: 0, x: "100%" }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: "100%" }}
+              className="fixed inset-0 z-[120] bg-white flex flex-col"
+            >
+              <div className="p-4 flex items-center gap-3 border-b">
+                <button onClick={() => setShowNotifications(false)} className="p-2">
+                  <ArrowLeft className="w-6 h-6" />
+                </button>
+                <h2 className="text-xl font-bold">Activity</h2>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Friend Requests</h3>
+                {friendRequests.length === 0 ? (
+                  <p className="text-slate-400 text-sm italic">No pending requests</p>
+                ) : (
+                  friendRequests.map((req: any) => (
+                    <div key={req.request_id} className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between">
                       <div
                         className="cursor-pointer"
                         onClick={() => {
-                          setShowSearch(false);
-                          navigate(`/profile/${u.id}`);
+                          setShowNotifications(false);
+                          navigate(`/profile/${req.from_user_id}`);
                         }}
                       >
-                        <p className="font-bold text-slate-800 hover:text-emerald-600 transition-colors">{u.full_name || u.email.split("@")[0]}</p>
-                        <p className="text-xs text-slate-500">{u.role}</p>
+                        <p className="text-sm font-bold text-slate-800 hover:text-emerald-700 transition-colors">{req.from_user_name}</p>
+                        <p className="text-xs text-slate-500">Sent a friend request</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            const res = await fetch(`${API_BASE}/friends/accept?request_id=${req.request_id}`, { method: "POST" });
+                            if (res.ok) {
+                              alert("Friend request accepted!");
+                              refetchFriendRequests();
+                            }
+                          }}
+                          className="p-2 bg-emerald-600 text-white rounded-lg"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const res = await fetch(`${API_BASE}/friends/reject?request_id=${req.request_id}`, { method: "POST" });
+                            if (res.ok) {
+                              refetchFriendRequests();
+                            }
+                          }}
+                          className="p-2 bg-slate-200 text-slate-600 rounded-lg"
+                        >
+                          Ignore
+                        </button>
                       </div>
                     </div>
-                    <button
-                      onClick={async () => {
-                        const res = await fetch(`${API_BASE}/friends/request`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ from_user_id: user?.id, to_user_id: u.id }),
-                        });
-                        if (res.ok) alert("Friend request sent!");
-                        else alert("Already friends or request pending.");
-                      }}
-                      className="px-4 py-2 bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm hover:bg-emerald-600 transition"
-                    >
-                      Connect
-                    </button>
-                  </div>
-                ))
-              ) : searchQuery && (
-                <div className="text-center py-10 text-slate-400">No users found.</div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                  ))
+                )}
 
-      <AnimatePresence>
-        {showNotifications && (
-          <motion.div
-            initial={{ opacity: 0, x: "100%" }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: "100%" }}
-            className="fixed inset-0 z-[120] bg-white flex flex-col"
-          >
-            <div className="p-4 flex items-center gap-3 border-b">
-              <button onClick={() => setShowNotifications(false)} className="p-2">
-                <ArrowLeft className="w-6 h-6" />
-              </button>
-              <h2 className="text-xl font-bold">Activity</h2>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Friend Requests</h3>
-              {friendRequests.length === 0 ? (
-                <p className="text-slate-400 text-sm italic">No pending requests</p>
-              ) : (
-                friendRequests.map((req: any) => (
-                  <div key={req.request_id} className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between">
-                    <div
-                      className="cursor-pointer"
-                      onClick={() => {
-                        setShowNotifications(false);
-                        navigate(`/profile/${req.from_user_id}`);
-                      }}
-                    >
-                      <p className="text-sm font-bold text-slate-800 hover:text-emerald-700 transition-colors">{req.from_user_name}</p>
-                      <p className="text-xs text-slate-500">Sent a friend request</p>
+                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mt-8 mb-2">Recent Notifications</h3>
+                {notifications.length === 0 ? (
+                  <p className="text-slate-400 text-sm italic">No recent activity</p>
+                ) : (
+                  notifications.map((n: any) => (
+                    <div key={n.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                      <p className="text-sm text-slate-700">{n.message}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">{new Date(n.created_at).toLocaleString()}</p>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={async () => {
-                          const res = await fetch(`${API_BASE}/friends/accept?request_id=${req.request_id}`, { method: "POST" });
-                          if (res.ok) {
-                            alert("Friend request accepted!");
-                            refetchFriendRequests();
-                          }
-                        }}
-                        className="p-2 bg-emerald-600 text-white rounded-lg"
-                      >
-                        Accept
-                      </button>
-                      <button
-                        onClick={async () => {
-                          const res = await fetch(`${API_BASE}/friends/reject?request_id=${req.request_id}`, { method: "POST" });
-                          if (res.ok) {
-                            refetchFriendRequests();
-                          }
-                        }}
-                        className="p-2 bg-slate-200 text-slate-600 rounded-lg"
-                      >
-                        Ignore
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-
-              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mt-8 mb-2">Recent Notifications</h3>
-              {notifications.length === 0 ? (
-                <p className="text-slate-400 text-sm italic">No recent activity</p>
-              ) : (
-                notifications.map((n: any) => (
-                  <div key={n.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <p className="text-sm text-slate-700">{n.message}</p>
-                    <p className="text-[10px] text-slate-400 mt-1">{new Date(n.created_at).toLocaleString()}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          </motion.div>
-        )}
-        {showFullProfilePic && user?.profile_pic && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4"
-            onClick={() => setShowFullProfilePic(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative max-w-2xl w-full aspect-square rounded-3xl overflow-hidden shadow-2xl border border-white/10"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <img
-                src={user.profile_pic}
-                alt="Full Profile"
-                className="w-full h-full object-cover"
-              />
-              <button
-                onClick={() => setShowFullProfilePic(false)}
-                className="absolute top-4 right-4 w-12 h-12 flex items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-md hover:bg-black/70 transition-colors"
-              >
-                ×
-              </button>
+                  ))
+                )}
+              </div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+          )}
+          {showFullProfilePic && user?.profile_pic && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4"
+              onClick={() => setShowFullProfilePic(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="relative max-w-2xl w-full aspect-square rounded-3xl overflow-hidden shadow-2xl border border-white/10"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <img
+                  src={user.profile_pic}
+                  alt="Full Profile"
+                  className="w-full h-full object-cover"
+                />
+                <button
+                  onClick={() => setShowFullProfilePic(false)}
+                  className="absolute top-4 right-4 w-12 h-12 flex items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-md hover:bg-black/70 transition-colors"
+                >
+                  ×
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div >
   );
 }

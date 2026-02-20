@@ -14,8 +14,8 @@ export default function BottomNav() {
   const location = useLocation();
   const { triggerRefresh } = useHomeRefresh();
   return (
-    <nav className="fixed bottom-0 left-0 right-0 flex justify-center z-50 pointer-events-none">
-      <div className="w-full max-w-[640px] md:max-w-[768px] bg-white/90 backdrop-blur-xl border-t border-slate-200/60 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] px-4 pb-6 pt-3 flex items-center justify-around pointer-events-auto">
+    <nav className="fixed bottom-0 left-0 right-0 flex justify-center z-50 pointer-events-none px-6 mb-8">
+      <div className="w-full max-w-[440px] glass-premium rounded-[32px] border border-white/40 shadow-2xl px-2 pb-2 pt-2 flex items-center justify-around pointer-events-auto overflow-hidden">
         {navItems.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
@@ -23,7 +23,6 @@ export default function BottomNav() {
             end={to === "/"}
             onClick={(e) => {
               if (to === "/") {
-                // If we are already on home, trigger refresh and scroll to top
                 if (location.pathname === "/") {
                   e.preventDefault();
                   triggerRefresh();
@@ -32,12 +31,19 @@ export default function BottomNav() {
               }
             }}
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center flex-1 py-1 text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${isActive ? "text-emerald-600 scale-110" : "text-slate-400 hover:text-slate-600"
+              `relative flex flex-col items-center justify-center flex-1 py-3 px-1 rounded-2xl transition-all duration-500 ${isActive
+                ? "text-emerald-900 bg-white/40 translate-y-[-2px]"
+                : "text-slate-500 hover:text-emerald-700"
               }`
             }
           >
-            <Icon className={`w-5 h-5 mb-1.5 transition-transform ${to === location.pathname ? 'stroke-[2.5px]' : 'stroke-[2px]'}`} />
-            <span className="opacity-80">{label}</span>
+            <Icon className={`w-5 h-5 mb-1 transition-all duration-500 ${to === location.pathname ? 'stroke-[2.5px] scale-110 drop-shadow-[0_0_8px_rgba(6,78,59,0.3)]' : 'stroke-[1.5px]'}`} />
+            <span className={`text-[10px] uppercase tracking-[0.1em] font-bold transition-all duration-500 ${to === location.pathname ? 'opacity-100' : 'opacity-40'}`}>
+              {label}
+            </span>
+            {to === location.pathname && (
+              <div className="absolute bottom-1 w-1 h-1 bg-emerald-900 rounded-full animate-pulse shadow-[0_0_8px_rgba(6,78,59,0.5)]" />
+            )}
           </NavLink>
         ))}
       </div>

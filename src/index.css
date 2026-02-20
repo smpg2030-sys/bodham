@@ -1,111 +1,118 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --glass-border: rgba(255, 255, 255, 0.5);
-  --glass-bg: rgba(255, 255, 255, 0.7);
+  /* Lux Wellness Palette */
+  --lux-emerald: #064e3b;
+  --lux-emerald-light: #065f46;
+  --lux-sage: #f0fdf4;
+  --lux-gold: #dec16d;
+  --lux-silk: #fdfdfd;
+  --lux-slate: #1e293b;
+
+  --glass-border: rgba(255, 255, 255, 0.4);
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-premium-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
 }
 
 body {
   margin: 0;
   font-family: 'Outfit', sans-serif;
-  background: #f8fafc;
-  color: #1e293b;
+  background: var(--lux-silk);
+  color: var(--lux-slate);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+.font-premium {
+  font-family: 'Playfair Display', serif;
 }
 
 /* Mobile app container */
 .app-container {
   max-width: 480px;
-  /* Slightly wider for premium feel */
   margin: 0 auto;
   min-height: 100vh;
-  background: #f8fafc;
+  background: var(--lux-silk);
   position: relative;
-  box-shadow: 0 0 50px rgba(0, 0, 0, 0.05);
-  /* Subtle depth */
+  box-shadow: 0 0 80px rgba(0, 0, 0, 0.03);
 }
 
-/* Glassmorphism Utilities */
-.glass {
+/* Premium Glassmorphism */
+.glass-premium {
   background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-premium-shadow);
 }
 
-.glass-card {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03);
-}
-
-/* Input fields */
+/* Input fields - Polished */
 .input-field {
   width: 100%;
-  padding: 16px;
+  padding: 18px;
   background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
+  border: 1.5px solid #f1f5f9;
+  border-radius: 20px;
   font-size: 15px;
   margin: 10px 0;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .input-field:focus {
   outline: none;
-  border-color: #10b981;
-  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+  border-color: var(--lux-emerald);
+  background: var(--lux-silk);
+  box-shadow: 0 10px 15px -3px rgba(6, 78, 59, 0.05);
 }
 
-/* Premium Card */
+/* Premium Card - Elevated */
 .post-card {
   background: white;
-  border-radius: 20px;
-  padding: 20px;
-  margin: 16px 0;
-  border: 1px solid #f1f5f9;
-  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.05);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 24px;
+  padding: 24px;
+  margin: 20px 0;
+  border: 1px solid rgba(241, 245, 249, 0.8);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
 }
 
 .post-card:active {
-  transform: scale(0.995);
+  transform: scale(0.98);
 }
 
-/* Goal card */
-.goal-card {
-  background: white;
-  border-radius: 20px;
-  padding: 24px;
-  margin: 12px 0;
-  border: 1px solid #e2e8f0;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
+/* Premium Buttons */
+.btn-premium {
+  background: var(--lux-emerald);
+  color: white;
+  padding: 16px 24px;
+  border-radius: 100px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 10px 20px -5px rgba(6, 78, 59, 0.2);
 }
 
-.goal-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+.btn-premium:hover {
+  background: var(--lux-emerald-light);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px -5px rgba(6, 78, 59, 0.25);
 }
 
-.goal-card.selected {
-  border-color: #10b981;
-  background: #ecfdf5;
-  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.15);
+.btn-gold {
+  background: linear-gradient(135deg, #fef3c7 0%, #dec16d 100%);
+  color: #92400e;
+  border: 1px solid rgba(214, 158, 46, 0.2);
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -113,15 +120,25 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #e2e8f0;
   border-radius: 10px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+/* Skeleton Premium */
+.animate-shimmer {
+  background: #f8fafc;
+  background-image: linear-gradient(to right,
+      #f8fafc 0%,
+      #f1f5f9 20%,
+      #f8fafc 40%,
+      #f8fafc 100%);
+  background-repeat: no-repeat;
+  background-size: 800px 104px;
+  display: inline-block;
+  position: relative;
+  animation: shimmer 2s linear infinite forwards;
 }
 
-/* Skeleton Shimmer Animation */
 @keyframes shimmer {
   0% {
     background-position: -468px 0;
@@ -132,16 +149,11 @@ body {
   }
 }
 
-.animate-shimmer {
-  background: #f1f5f9;
-  background-image: linear-gradient(to right,
-      #f1f5f9 0%,
-      #e2e8f0 20%,
-      #f1f5f9 40%,
-      #f1f5f9 100%);
-  background-repeat: no-repeat;
-  background-size: 800px 104px;
-  display: inline-block;
-  position: relative;
-  animation: shimmer 1.5s linear infinite forwards;
+/* Micro-interactions */
+.hover-lift {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
 }
