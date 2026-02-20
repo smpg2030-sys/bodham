@@ -13,7 +13,7 @@ import PostCard from "../components/PostCard";
 import PostSkeleton from "../components/PostSkeleton";
 import StoryCard from "../components/StoryCard";
 
-const TABS = ["All Posts", "Stories", "Daily Quotes", "Gratitude"] as const;
+const TABS = ["All Posts", "Discover", "Stories", "Daily Quotes", "Gratitude"] as const;
 
 const getApiBase = () => {
   const base = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000/api" : "/api");
@@ -72,8 +72,12 @@ export default function HomeFeedScreen() {
       }
 
       const skip = pParam * 15;
+      const postsUrl = activeTab === "Discover"
+        ? `${API_BASE}/posts/?limit=15&skip=${skip}`
+        : `${API_BASE}/posts/?user_id=${user?.id || ""}&limit=15&skip=${skip}`;
+
       const [postsRes, videosRes] = await Promise.all([
-        fetch(`${API_BASE}/posts/?user_id=${user?.id || ""}&limit=15&skip=${skip}`),
+        fetch(postsUrl),
         fetch(`${API_BASE}/videos/?limit=5&skip=${pParam * 5}`)
       ]);
 
@@ -655,7 +659,7 @@ export default function HomeFeedScreen() {
             <PostSkeleton />
             <PostSkeleton />
           </div>
-        ) : activeTab === "All Posts" ? (
+        ) : activeTab === "All Posts" || activeTab === "Discover" ? (
           <div className="h-[calc(100vh-200px)]">
             {allPosts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -778,7 +782,7 @@ export default function HomeFeedScreen() {
                 <StoryCard
                   key={story.id}
                   story={story}
-                  onClick={() => {/* Navigate to story detail if we have one */ }}
+                  onClick={() => {/* Navigate to story detail */ }}
                 />
               ))
             )}
